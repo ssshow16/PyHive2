@@ -3,8 +3,8 @@ import jpype
 import util
 import subprocess
 import j2p
-
-from pandas import DataFrame
+import hdfs
+import pandas as pd
 
 class Constants(object):
     DEFAULT_FS_HOME = "/rhive"
@@ -143,21 +143,110 @@ def connect(context = Context(), hiveInfo = HiveInfo(), db = "default", user = "
 
 def query(connection, query):
     client = connection.getHiveJdbcClient()
-    rs = client.query(query)
-    df = convertResultSetToDataFrame(rs)
-    rs.close()
+    dfModel = client.query(query)
+    df = util.convertDataFrame(dfModel)
+    dfModel.close()
+
+    return df
+
+def execute(connection, query):
+    client = connection.getHiveJdbcClient()
+    dfModel = client.execute(query)
+    df = util.convertDataFrame(dfModel)
+    dfModel.close()
+
     return df
 
 def queryForString(connection, query):
     client = connection.getHiveJdbcClient()
-    rs = client.query(query)
-    string = convertResultSetToString(rs)
-    rs.close()
-    return string
+    dfModel = client.query(query)
+    dfString = dfModel.toString()
+    dfModel.close()
+    return dfString
 
 def execute(connection, query):
     client = connection.getHiveJdbcClient()
     client.execute(query)
+
+def loadTable(connection,tableName, limit=-1):
+    def copyData():
+        srcDir = tableLocation(connection,tableName)
+        ## TODO
+        dstDir = os.getcwd()
+        hdfs.dfsGet(connection, srcDir, dstDir)
+        dataDir = os.path.join(dstDir,tableName)
+        return dataDir
+
+    def loadData(dataDir):
+        d = None;
+        for base, dirs, files in os.walk(dataDir):
+            for file in files:
+                path = os.path.join(base,file)
+                if os.path.getsize(path) == 0:
+                    continue
+                if file.endswith(".crc"):
+                    continue
+
+                data = pd.read_csv(path,header=None)
+                if d == None:
+                    d = data
+                else:
+                    d.append(data,ignore_index=True)
+
+        if d is not None:
+            d.columns = tableColumns(connection,tableName)
+
+        return d
+
+    dataDir = copyData()
+    df = loadData(dataDir)
+
+    return df
+
+def writeTable(connection, data, tableName, sep = ",", na = ""):
+    def writeDataToLocal():
+        #file <- wf(connection@session, table.name, postfix = sprintf("_%s", nexr.random.key()))
+        file = ""
+        data.to_csv(file, sep = sep, header=None, index = False)
+        return file
+
+    def findColtypes():
+        type.character <- sapply(data, is.character)
+        type.numeric   <- sapply(data, is.numeric)
+        type.integer   <- sapply(data, is.integer)
+        type.logical   <- sapply(data, is.logical)
+        type.factor    <- sapply(data, is.factor)
+
+        coltypes <- character(length(data))
+        coltypes[type.character] <- "string"
+        coltypes[type.numeric] <- "double"
+        coltypes[type.integer] <- "int"
+        coltypes[type.logical] <- "boolean"
+        coltypes[type.factor] <- "string"
+
+        names(coltypes) <- names(data)
+        return(coltypes)
+
+    def loadDataIntoHive(dataFile,coltypes):
+        #dst <- hdfs.path(connection@session@fs.tmp, basename(data.file))
+        dst = ""
+        hdfs.dfsPut(connection, dataFile, dst, srcDel = False, overWrite = True)
+
+        colnames <- gsub("[^[:alnum:]_]+", "", names(coltypes))
+
+        # if (any(duplicated(tolower(colnames))) == TRUE) {
+        #     stop(paste("Hive doesn't support case-sensitive column-names: ", paste(colnames, collapse = ",")))
+        # }
+
+        cols = paste(colnames, coltypes)
+        sql = "create table %s ( %s ) row format delimited fields terminated by '%s'" % (tableName, ",".join(cols), sep)
+        execute(connection,sql)
+
+        sql = "load data inpath '%s' overwrite into table %s" % (dst,tableName)
+        execute(connection, l.qry)
+
+
+# def wf(session, name, prefix, postfix):
 
 def descTable(connection, tableName, extended = False):
 
@@ -172,9 +261,17 @@ def descTable(connection, tableName, extended = False):
 
     return result
 
+def tableColumns(connection, tableName):
+    desc = descTable(connection,tableName)
+    return desc['col_name'].tolist()
+
 def tableLocation(connection, tableName):
     desc = descTable(connection,tableName,True)
+
     location = util.searchWithRegex(desc,"location\\s*:\\s*[^,]+",0)
+    location = util.replaceWithRegex("^location\\s*:(\\s*)","",location)
+    location = util.replaceWithRegex("^[A-Za-z ]*://[^:/]*(:[0-9]+)?","",location)
+
     return location
 
 def existsTable(connection, tableName):
@@ -184,10 +281,6 @@ def existsTable(connection, tableName):
 def dropTable(connection, tableNames):
     for tableName in tableNames:
         execute(connection,"drop table if exists %s" % tableName)
-
-# def dataSize(connection, tableName):
-#     location = tableLocation(connection,tableName)
-#     dataInfo =
 
 
 def showTables(connection, tableNamePattern=".*"):
@@ -209,40 +302,3 @@ def set(connection, key=None, value=None):
             return query(connection,"set %s" % key)
     else:
         execute(connection,"set %s=%s" % (key,value))
-
-def convertResultSetToDataFrame(rs):
-
-    colNames = util.getColumnNames(rs)
-    colTypes = util.getColumnTypes(rs)
-    colCnt = util.getColumnCount(rs)
-
-    rows = []
-    while rs.next():
-        row = []
-        for i in range(colCnt):
-            val = util.getColumnValue(rs, i+1, colTypes[i])
-            row.extend([val])
-        rows.append(row)
-
-    df = DataFrame(rows, columns=colNames)
-
-    return df
-
-def convertResultSetToString(rs):
-
-    colCnt = util.getColumnCount(rs)
-
-    result = ""
-    while rs.next():
-
-        if len(result) > 0:
-            result += "\n"
-
-        for i in range(colCnt):
-            val = util.getColumnValue(rs, i+1, "string")
-            if val == None:
-                result = result + ""
-            else:
-                result = result + val
-
-    return result

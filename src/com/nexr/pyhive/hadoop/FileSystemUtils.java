@@ -1,10 +1,9 @@
 package com.nexr.pyhive.hadoop;
 
+import com.nexr.pyhive.model.DataFrameModel;
+import com.nexr.pyhive.model.MapModel;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileStatus;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.FileUtil;
-import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.*;
 import org.apache.hadoop.security.UserGroupInformation;
 
 import java.io.IOException;
@@ -36,8 +35,6 @@ public class FileSystemUtils {
 			return FileSystemUtils.getConf(defaultFS, user);
 		}
 	}
-
-
 
     public static Configuration getConf(String defaultFS, String user) {
         Configuration conf = new Configuration();
@@ -147,7 +144,7 @@ public class FileSystemUtils {
 //		return ugi.doAs(new ListFilesCommandPrivilegedExceptionAction(src, defaultFS, user));
 //	}
 
-	public static class DiskUsageCommandPrivilegedExceptionAction extends CommandPrivilegedExceptionAction<Map<String,List>> {
+	public static class DiskUsageCommandPrivilegedExceptionAction extends CommandPrivilegedExceptionAction<DataFrameModel> {
 		private Path path;
 		
 		public DiskUsageCommandPrivilegedExceptionAction(String src, String defaultFS, String user) {
@@ -156,7 +153,7 @@ public class FileSystemUtils {
 		}
 
 		@Override
-		public Map<String,List> run() throws Exception {
+		public DataFrameModel run() throws Exception {
 
 			Configuration conf = getConf();
 			
@@ -181,27 +178,30 @@ public class FileSystemUtils {
 				closeFileSystem(fs);
 			}
 
-            Map<String,List> rList = new HashMap<String,List>();
-			double[] lengths = new double[fileStatuses.length];
-			String[] files = new String[fileStatuses.length];
+            List lengths = new ArrayList();
+            List files = new ArrayList();
 
 			for (int j = 0; j < fileStatuses.length; j++) {
 				FileStatus fileStatus = fileStatuses[j];
 
-				lengths[j] = lens[j];
-				files[j] = fileStatus.getPath().toUri().getPath();
+                lengths.add(lens[j]);
+                files.add(fileStatus.getPath().toUri().getPath());
 			}
 
-			rList.put("length", Arrays.asList(lengths));
-            rList.put("file", Arrays.asList(files));
+            List<List> values = new ArrayList<List>();
+            values.add(lengths);
+            values.add(files);
 
-            Set names = rList.keySet();
+            DataFrameModel model = new MapModel(
+                    new String[]{"length","file"},
+                    new String[]{"double","string"},
+                    values);
 
-            return rList;
+            return model;
 		}
 	}
 	
-	public static Map<String,List> du(String src, String defaultFS, String user) throws IOException, InterruptedException {
+	public static DataFrameModel du(String src, String defaultFS, String user) throws IOException, InterruptedException {
 		UserGroupInformation ugi = UserGroupInformation.createRemoteUser(user);
 		return ugi.doAs(new DiskUsageCommandPrivilegedExceptionAction(src, defaultFS, user));
 	}
@@ -262,80 +262,80 @@ public class FileSystemUtils {
 //		return ugi.doAs(new DiskUsageSummaryCommandPrivilegedExceptionAction(src, defaultFS, user));
 //	}
 
-//	public static class CopyFromLocalCommandPrivilegedExceptionAction extends CommandPrivilegedExceptionAction<Void> {
-//		private Path srcPath;
-//		private Path dstPath;
-//		private boolean delSrc;
-//		private boolean overwrite;
-//
-//		public CopyFromLocalCommandPrivilegedExceptionAction(boolean delSrc, boolean overwrite, String src, String dst, String defaultFS, String user) {
-//			super(defaultFS, user);
-//			this.srcPath = new Path(src);
-//			this.dstPath = new Path(dst);
-//			this.delSrc = delSrc;
-//			this.overwrite = overwrite;
-//		}
-//
-//		@Override
-//		public Void run() throws Exception {
-//			Configuration conf = getConf();
-//
-//			FileSystem fs = null;
-//			try {
-//				fs = FileSystem.get(conf);
-//				fs.copyFromLocalFile(delSrc, overwrite, srcPath, dstPath);
-//			} finally {
-//				closeFileSystem(fs);
-//			}
-//
-//			return null;
-//		}
-//	}
-//
-//
-//	public static Void copyFromLocal(boolean delSrc, boolean overwrite, String src, String dst, String defaultFS, String user) throws IOException, InterruptedException {
-//		UserGroupInformation ugi = UserGroupInformation.createRemoteUser(user);
-//		return ugi.doAs(new CopyFromLocalCommandPrivilegedExceptionAction(delSrc, overwrite, src, dst, defaultFS, user));
-//	}
-//
-//	public static class CopyToLocalCommandPrivilegedExceptionAction extends CommandPrivilegedExceptionAction<Void> {
-//		private Path srcPath;
-//		private Path dstPath;
-//		private boolean delSrc;
-//
-//		public CopyToLocalCommandPrivilegedExceptionAction(boolean delSrc, String src, String dst, String defaultFS, String user) {
-//			super(defaultFS, user);
-//			this.srcPath = new Path(src);
-//			this.dstPath = new Path(dst);
-//			this.delSrc = delSrc;
-//		}
-//
-//		@Override
-//		public Void run() throws Exception {
-//			Configuration conf = getConf();
-//
-//			FileSystem fs = null;
-//			try {
-//				fs = FileSystem.get(conf);
-//
+	public static class CopyFromLocalCommandPrivilegedExceptionAction extends CommandPrivilegedExceptionAction<Void> {
+		private Path srcPath;
+		private Path dstPath;
+		private boolean delSrc;
+		private boolean overwrite;
+
+		public CopyFromLocalCommandPrivilegedExceptionAction(boolean delSrc, boolean overwrite, String src, String dst, String defaultFS, String user) {
+			super(defaultFS, user);
+			this.srcPath = new Path(src);
+			this.dstPath = new Path(dst);
+			this.delSrc = delSrc;
+			this.overwrite = overwrite;
+		}
+
+		@Override
+		public Void run() throws Exception {
+			Configuration conf = getConf();
+
+			FileSystem fs = null;
+			try {
+				fs = FileSystem.get(conf);
+				fs.copyFromLocalFile(delSrc, overwrite, srcPath, dstPath);
+			} finally {
+				closeFileSystem(fs);
+			}
+
+			return null;
+		}
+	}
+
+	public static Void copyFromLocal(boolean delSrc, boolean overwrite, String src, String dst, String defaultFS, String user) throws IOException, InterruptedException {
+		UserGroupInformation ugi = UserGroupInformation.createRemoteUser(user);
+		return ugi.doAs(new CopyFromLocalCommandPrivilegedExceptionAction(delSrc, overwrite, src, dst, defaultFS, user));
+	}
+
+	public static class CopyToLocalCommandPrivilegedExceptionAction extends CommandPrivilegedExceptionAction<Void> {
+		private Path srcPath;
+		private Path dstPath;
+		private boolean delSrc;
+
+		public CopyToLocalCommandPrivilegedExceptionAction(boolean delSrc, String src, String dst, String defaultFS, String user) {
+			super(defaultFS, user);
+			this.srcPath = new Path(src);
+			this.dstPath = new Path(dst);
+			this.delSrc = delSrc;
+		}
+
+		@Override
+		public Void run() throws Exception {
+			Configuration conf = getConf();
+
+			FileSystem fs = null;
+			try {
+				fs = FileSystem.get(conf);
+
 //				if (fs instanceof ChecksumFileSystem && delSrc == false) {
 //					((ChecksumFileSystem) fs).copyToLocalFile(srcPath, dstPath, false);
 //				} else {
-//					fs.copyToLocalFile(delSrc, srcPath, dstPath);
+					fs.copyToLocalFile(delSrc, srcPath, dstPath);
 //				}
-//			} finally {
-//				closeFileSystem(fs);
-//			}
-//
-//			return null;
-//		}
-//	}
-//
-//	public static Void copyToLocal(boolean delSrc, String src, String dst, String defaultFS, String user) throws IOException, InterruptedException {
-//		UserGroupInformation ugi = UserGroupInformation.createRemoteUser(user);
-//		return ugi.doAs(new CopyToLocalCommandPrivilegedExceptionAction(delSrc, src, dst, defaultFS, user));
-//	}
-//
+
+			} finally {
+				closeFileSystem(fs);
+			}
+
+			return null;
+		}
+	}
+
+	public static Void copyToLocal(boolean delSrc, String src, String dst, String defaultFS, String user) throws IOException, InterruptedException {
+		UserGroupInformation ugi = UserGroupInformation.createRemoteUser(user);
+		return ugi.doAs(new CopyToLocalCommandPrivilegedExceptionAction(delSrc, src, dst, defaultFS, user));
+	}
+
 //
 //	public static class DeleteCommandPrivilegedExceptionAction extends CommandPrivilegedExceptionAction<Boolean> {
 //		private Path path;

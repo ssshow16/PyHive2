@@ -1,7 +1,8 @@
 package com.nexr.pyhive.hive;
 
+import com.nexr.pyhive.model.DataFrameModel;
+
 import java.sql.SQLException;
-import java.sql.ResultSet;
 
 /**
  * Created by bruceshin on 10/31/14.
@@ -13,6 +14,6 @@ public interface JDBCOperation {
 
     boolean execute(String query) throws Exception;
 
-    ResultSet query(String query) throws Exception;
-    ResultSet query(String query, int maxRows, int fetchSize) throws Exception;
+    DataFrameModel query(String query) throws Exception;
+    DataFrameModel query(String query, int maxRows, int fetchSize) throws Exception;
 }

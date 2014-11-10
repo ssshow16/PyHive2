@@ -1,5 +1,7 @@
 package com.nexr.pyhive.hive;
 
+import com.nexr.pyhive.model.DataFrameModel;
+import com.nexr.pyhive.model.ResultSetModel;
 import org.apache.hadoop.hive.ql.lib.Node;
 import org.apache.hadoop.hive.ql.parse.ASTNode;
 import org.apache.hadoop.hive.ql.parse.ParseDriver;
@@ -209,16 +211,16 @@ public class HiveJdbcClient implements JDBCOperation {
 	}
 
 	@Override
-	public ResultSet query(String query) throws SQLException {
+	public DataFrameModel query(String query) throws SQLException {
 		return query(query, 0, 50);
 	}
 
 	@Override
-	public ResultSet query(String query, int maxRows, int fetchSize) throws SQLException {
+	public DataFrameModel query(String query, int maxRows, int fetchSize) throws SQLException {
 		return query(query, maxRows, fetchSize, false);
 	}
 	
-	protected ResultSet query(String query, int maxRows, int fetchSize, boolean reconnect) throws SQLException {
+	protected DataFrameModel query(String query, int maxRows, int fetchSize, boolean reconnect) throws SQLException {
 		Connection connection = getConnection(reconnect);
 		Statement statement = null;
 		try {
@@ -227,7 +229,7 @@ public class HiveJdbcClient implements JDBCOperation {
 			statement.setFetchSize(fetchSize <= 0 ? 50 : fetchSize);
 			ResultSet rs = statement.executeQuery(query);
 			
-			return rs;
+			return new ResultSetModel(rs);
 		} catch (SQLException e) {
 			if (!reconnect) {
 				if (isThriftTransportException(e)) {
@@ -239,7 +241,7 @@ public class HiveJdbcClient implements JDBCOperation {
 		}
 	}
 
-	protected ResultSet requery(String query, int maxRows, int fetchSize) throws SQLException {
+	protected DataFrameModel requery(String query, int maxRows, int fetchSize) throws SQLException {
 		return query(query, maxRows, fetchSize, true);
 	}
 
