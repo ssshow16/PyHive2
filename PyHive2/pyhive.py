@@ -203,48 +203,47 @@ def loadTable(connection,tableName, limit=-1):
 
     return df
 
-def writeTable(connection, data, tableName, sep = ",", na = ""):
-    def writeDataToLocal():
-        #file <- wf(connection@session, table.name, postfix = sprintf("_%s", nexr.random.key()))
-        file = ""
-        data.to_csv(file, sep = sep, header=None, index = False)
-        return file
-
-    def findColtypes():
-        type.character <- sapply(data, is.character)
-        type.numeric   <- sapply(data, is.numeric)
-        type.integer   <- sapply(data, is.integer)
-        type.logical   <- sapply(data, is.logical)
-        type.factor    <- sapply(data, is.factor)
-
-        coltypes <- character(length(data))
-        coltypes[type.character] <- "string"
-        coltypes[type.numeric] <- "double"
-        coltypes[type.integer] <- "int"
-        coltypes[type.logical] <- "boolean"
-        coltypes[type.factor] <- "string"
-
-        names(coltypes) <- names(data)
-        return(coltypes)
-
-    def loadDataIntoHive(dataFile,coltypes):
-        #dst <- hdfs.path(connection@session@fs.tmp, basename(data.file))
-        dst = ""
-        hdfs.dfsPut(connection, dataFile, dst, srcDel = False, overWrite = True)
-
-        colnames <- gsub("[^[:alnum:]_]+", "", names(coltypes))
-
-        # if (any(duplicated(tolower(colnames))) == TRUE) {
-        #     stop(paste("Hive doesn't support case-sensitive column-names: ", paste(colnames, collapse = ",")))
-        # }
-
-        cols = paste(colnames, coltypes)
-        sql = "create table %s ( %s ) row format delimited fields terminated by '%s'" % (tableName, ",".join(cols), sep)
-        execute(connection,sql)
-
-        sql = "load data inpath '%s' overwrite into table %s" % (dst,tableName)
-        execute(connection, l.qry)
-
+# def writeTable(connection, data, tableName, sep = ",", na = ""):
+#     def writeDataToLocal():
+#         #file <- wf(connection@session, table.name, postfix = sprintf("_%s", nexr.random.key()))
+#         file = ""
+#         data.to_csv(file, sep = sep, header=None, index = False)
+#         return file
+#
+#     def findColtypes():
+#         type.character <- sapply(data, is.character)
+#         type.numeric   <- sapply(data, is.numeric)
+#         type.integer   <- sapply(data, is.integer)
+#         type.logical   <- sapply(data, is.logical)
+#         type.factor    <- sapply(data, is.factor)
+#
+#         coltypes <- character(length(data))
+#         coltypes[type.character] <- "string"
+#         coltypes[type.numeric] <- "double"
+#         coltypes[type.integer] <- "int"
+#         coltypes[type.logical] <- "boolean"
+#         coltypes[type.factor] <- "string"
+#
+#         names(coltypes) <- names(data)
+#         return(coltypes)
+#
+#     def loadDataIntoHive(dataFile,coltypes):
+#         #dst <- hdfs.path(connection@session@fs.tmp, basename(data.file))
+#         dst = ""
+#         hdfs.dfsPut(connection, dataFile, dst, srcDel = False, overWrite = True)
+#
+#         colnames <- gsub("[^[:alnum:]_]+", "", names(coltypes))
+#
+#         # if (any(duplicated(tolower(colnames))) == TRUE) {
+#         #     stop(paste("Hive doesn't support case-sensitive column-names: ", paste(colnames, collapse = ",")))
+#         # }
+#
+#         cols = paste(colnames, coltypes)
+#         sql = "create table %s ( %s ) row format delimited fields terminated by '%s'" % (tableName, ",".join(cols), sep)
+#         execute(connection,sql)
+#
+#         sql = "load data inpath '%s' overwrite into table %s" % (dst,tableName)
+#         execute(connection, l.qry)
 
 # def wf(session, name, prefix, postfix):
 
