@@ -4,6 +4,7 @@ import util
 import subprocess
 import j2p
 import hdfs
+import tempfile
 import pandas as pd
 
 class Constants(object):
@@ -17,6 +18,44 @@ class Constants(object):
     HIVE_WAREHOUSE_DIR_CONF = "hive.metastore.warehouse.dir"
     HIVE_SERVER2_ENABLE_DOAS_CONF = "hive.server2.enable.doAs"
     HIVE_QUERYLOG_LOCATION_CONF = "hive.querylog.location"
+
+class SysEnv(object):
+    def __init__(self, hiveHome, hiveLib, hiveAuxLib, hiveServer2, hadoopHome, hadoopCmd, fsHome):
+        self.__hiveHome = hiveHome
+        self.__hiveLib = hiveLib
+        self.__hiveAuxlib = hiveAuxLib
+        self.__hiveServer2 = hiveServer2
+        self.__hadoopHome = hadoopHome
+        self.__hadoopCmd = hadoopCmd
+        self.__fsHome = fsHome
+    def setHiveHome(self,hiveHome):
+        self.__hiveHome = hiveHome
+    def getHiveHome(self):
+        return self.__hiveHome
+    def setHiveLib(self,hiveLib):
+        self.__hiveLib = hiveLib
+    def getHiveLib(self):
+        return self.__hiveLib
+    def setHiveAuxLib(self,hiveAuxLib):
+        self.__hiveAuxLib = hiveAuxLib
+    def getHiveAuxLib(self):
+        return self.__hiveAuxLib
+    def setHiveServer2(self,hiveServer2):
+        self.__hiveServer2 = hiveServer2
+    def getHiveServer2(self):
+        return self.__hiveServer2
+    def setHadoopHome(self,hadoopHome):
+        self.__hadoopHome = hadoopHome
+    def getHadoopHome(self):
+        return self.__hadoopHome
+    def setHadoopCmd(self,hadoopCmd):
+        self.__hadoopCmd = hadoopCmd
+    def getHadoopCmd(self):
+        return self.__hadoopCmd
+    def setFsHome(self,fsHome):
+        self.__fsHome = fsHome
+    def getFsHome(self):
+        return self.__fsHome
 
 class Context(object):
     def __init__(self):
@@ -76,17 +115,47 @@ class HiveInfo(object):
         return self.__isServer2
 
 class HiveConnection(object):
-    def __init__(self, hiveJdbcClient):
+    def __init__(self, hiveJdbcClient, session):
         self.__hiveJdbcClient = hiveJdbcClient
+        self.__session = session
     def getHiveJdbcClient(self):
         return self.__hiveJdbcClient
     def setFsDefault(self,fsDefault):
         self.__fsDefault = fsDefault
     def getFsDefault(self):
         return self.__fsDefault
+    def getSession(self):
+        return self.__session
 
-def init(hadoopHome, hiveHome):
+class HiveSession(object):
+    def __init__(self, user, fsTmp, fsUdfs):
+        self.__user = user
+        self.__pseudoUser = user
+        self.__tempDir = tempfile.mkdtemp()
+        self.__fsTmp = fsTmp
+        self.__fsUdfs = fsUdfs
+    def getUser(self):
+        return self.__user
+    def getTempDir(self):
+        return self.__tempDir
+    def getFsTmp(self):
+        return self.__fsTmp
+    def getFsUdfs(self):
+        return self.__fsUdfs
+
+class pyhiveGlobalInjector(object):
     pass
+
+def init():
+    sysEnv = SysEnv(hiveHome=os.environ.get("HIVE_HOME",""),
+                    hiveLib=os.environ.get("HIVE_LIB",""),
+                    hiveAuxlib = os.environ.get("HIVE_AUXLIB",""),
+                    hiveServer2 = os.environ.get("HIVESERVER2",True),
+                    hadoopHome = os.environ.get("HADOOP_HOME",""),
+                    hadoopCmd = os.environ.get("HADOOP_CMD",""),
+                    fsHome = os.environ.get("HADOOP_HOME",""))
+
+
 
 def startJVM(context):
 
@@ -134,6 +203,12 @@ def connect(context = Context(), hiveInfo = HiveInfo(), db = "default", user = "
     startJVM(context)
     jHiveJdbcClient = j2p.createHiveJdbcClient(context)
     jHiveJdbcClient.connect(hiveInfo.getHost(), hiveInfo.getport(), db, user, password)
+
+    # def fsHome:
+    #     if is.empty(configuration@sys.env@fs.home):
+    #         return(configuration@constants@DEFAULT.FS.HOME)
+    #     else:
+    #         return(configuration@sys.env@fs.home)
 
     hiveConnection = HiveConnection(jHiveJdbcClient)
     ## TODO
@@ -203,49 +278,65 @@ def loadTable(connection,tableName, limit=-1):
 
     return df
 
-# def writeTable(connection, data, tableName, sep = ",", na = ""):
-#     def writeDataToLocal():
-#         #file <- wf(connection@session, table.name, postfix = sprintf("_%s", nexr.random.key()))
-#         file = ""
-#         data.to_csv(file, sep = sep, header=None, index = False)
-#         return file
-#
-#     def findColtypes():
-#         type.character <- sapply(data, is.character)
-#         type.numeric   <- sapply(data, is.numeric)
-#         type.integer   <- sapply(data, is.integer)
-#         type.logical   <- sapply(data, is.logical)
-#         type.factor    <- sapply(data, is.factor)
-#
-#         coltypes <- character(length(data))
-#         coltypes[type.character] <- "string"
-#         coltypes[type.numeric] <- "double"
-#         coltypes[type.integer] <- "int"
-#         coltypes[type.logical] <- "boolean"
-#         coltypes[type.factor] <- "string"
-#
-#         names(coltypes) <- names(data)
-#         return(coltypes)
-#
-#     def loadDataIntoHive(dataFile,coltypes):
-#         #dst <- hdfs.path(connection@session@fs.tmp, basename(data.file))
-#         dst = ""
-#         hdfs.dfsPut(connection, dataFile, dst, srcDel = False, overWrite = True)
-#
-#         colnames <- gsub("[^[:alnum:]_]+", "", names(coltypes))
-#
-#         # if (any(duplicated(tolower(colnames))) == TRUE) {
-#         #     stop(paste("Hive doesn't support case-sensitive column-names: ", paste(colnames, collapse = ",")))
-#         # }
-#
-#         cols = paste(colnames, coltypes)
-#         sql = "create table %s ( %s ) row format delimited fields terminated by '%s'" % (tableName, ",".join(cols), sep)
-#         execute(connection,sql)
-#
-#         sql = "load data inpath '%s' overwrite into table %s" % (dst,tableName)
-#         execute(connection, l.qry)
+def writeTable(connection, data, tableName, sep = ",", na = ""):
+    def writeDataToLocal():
+        #file <- wf(connection@session, table.name, postfix = sprintf("_%s", nexr.random.key()))
+        file = wf(tableName, postfix="_" + util.randomKeyGen())
+        data.to_csv(file, sep = sep, header=None, index = False)
+        return file
 
-# def wf(session, name, prefix, postfix):
+    # def findColtypes():
+    #     type.character <- sapply(data, is.character)
+    #     type.numeric   <- sapply(data, is.numeric)
+    #     type.integer   <- sapply(data, is.integer)
+    #     type.logical   <- sapply(data, is.logical)
+    #     type.factor    <- sapply(data, is.factor)
+    #
+    #     coltypes <- character(length(data))
+    #     coltypes[type.character] <- "string"
+    #     coltypes[type.numeric] <- "double"
+    #     coltypes[type.integer] <- "int"
+    #     coltypes[type.logical] <- "boolean"
+    #     coltypes[type.factor] <- "string"
+    #
+    #     names(coltypes) <- names(data)
+    #     return(coltypes)
+
+    def loadDataIntoHive(dataFile,coltypes):
+        #dst <- hdfs.path(connection@session@fs.tmp, basename(data.file))
+        dst = hdfsPath(connection)
+        os.path.basename(dataFile)
+
+        dst = ""
+        hdfs.dfsPut(connection, dataFile, dst, srcDel = False, overWrite = True)
+
+        colnames <- gsub("[^[:alnum:]_]+", "", names(coltypes))
+
+        # if (any(duplicated(tolower(colnames))) == TRUE) {
+        #     stop(paste("Hive doesn't support case-sensitive column-names: ", paste(colnames, collapse = ",")))
+        # }
+
+        cols = paste(colnames, coltypes)
+        sql = "create table %s ( %s ) row format delimited fields terminated by '%s'" % (tableName, ",".join(cols), sep)
+        execute(connection,sql)
+
+        sql = "load data inpath '%s' overwrite into table %s" % (dst,tableName)
+        execute(connection, l.qry)
+
+def hdfsPath(a,*p):
+    paths = [a]
+    for path in p:
+        paths.extend(path)
+    return "/".join(paths)
+
+def wf(name, prefix=None, postfix=None):
+    if prefix is not None:
+        name = prefix + name
+
+    if postfix is not None:
+        name = name + postfix
+
+    return os.path.join(os.getcwd(),name)
 
 def descTable(connection, tableName, extended = False):
 
