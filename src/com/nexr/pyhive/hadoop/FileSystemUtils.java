@@ -394,61 +394,61 @@ public class FileSystemUtils {
 //		return ugi.doAs(new RenameCommandPrivilegedExceptionAction(src, dst, defaultFS, user));
 //	}
 //
-//	public static class ExistsCommandPrivilegedExceptionAction extends CommandPrivilegedExceptionAction<Boolean> {
-//		private Path path;
-//
-//		public ExistsCommandPrivilegedExceptionAction(String file, String defaultFS, String user) {
-//			super(defaultFS, user);
-//			this.path = new Path(file);
-//		}
-//
-//		@Override
-//		public Boolean run() throws Exception {
-//			Configuration conf = getConf();
-//
-//			FileSystem fs = null;
-//			try {
-//				fs = path.getFileSystem(conf);
-//				return fs.exists(path);
-//			} finally {
-//				closeFileSystem(fs);
-//			}
-//		}
-//	}
-//
-//	public static boolean exists(String file, String defaultFS, String user) throws IOException, InterruptedException {
-//		UserGroupInformation ugi = UserGroupInformation.createRemoteUser(user);
-//		return ugi.doAs(new ExistsCommandPrivilegedExceptionAction(file, defaultFS, user));
-//	}
-//
-//
-//	public static class MakeDirsCommandPrivilegedExceptionAction extends CommandPrivilegedExceptionAction<Boolean> {
-//		private Path path;
-//
-//		public MakeDirsCommandPrivilegedExceptionAction(String file, String defaultFS, String user) {
-//			super(defaultFS, user);
-//			this.path = new Path(file);
-//		}
-//
-//		@Override
-//		public Boolean run() throws Exception {
-//			Configuration conf = getConf();
-//
-//			FileSystem fs = null;
-//			try {
-//				fs = path.getFileSystem(conf);
-//				return fs.mkdirs(path);
-//			} finally {
-//				closeFileSystem(fs);
-//			}
-//		}
-//	}
-//
-//	public static boolean mkdirs(String file, String defaultFS, String user) throws IOException, InterruptedException {
-//		UserGroupInformation ugi = UserGroupInformation.createRemoteUser(user);
-//		return ugi.doAs(new MakeDirsCommandPrivilegedExceptionAction(file, defaultFS, user));
-//	}
-//
+	public static class ExistsCommandPrivilegedExceptionAction extends CommandPrivilegedExceptionAction<Boolean> {
+		private Path path;
+
+		public ExistsCommandPrivilegedExceptionAction(String file, String defaultFS, String user) {
+			super(defaultFS, user);
+			this.path = new Path(file);
+		}
+
+		@Override
+		public Boolean run() throws Exception {
+			Configuration conf = getConf();
+
+			FileSystem fs = null;
+			try {
+				fs = path.getFileSystem(conf);
+				return fs.exists(path);
+			} finally {
+				closeFileSystem(fs);
+			}
+		}
+	}
+
+	public static boolean exists(String file, String defaultFS, String user) throws IOException, InterruptedException {
+		UserGroupInformation ugi = UserGroupInformation.createRemoteUser(user);
+		return ugi.doAs(new ExistsCommandPrivilegedExceptionAction(file, defaultFS, user));
+	}
+
+
+	public static class MakeDirsCommandPrivilegedExceptionAction extends CommandPrivilegedExceptionAction<Boolean> {
+		private Path path;
+
+		public MakeDirsCommandPrivilegedExceptionAction(String file, String defaultFS, String user) {
+			super(defaultFS, user);
+			this.path = new Path(file);
+		}
+
+		@Override
+		public Boolean run() throws Exception {
+			Configuration conf = getConf();
+
+			FileSystem fs = null;
+			try {
+				fs = path.getFileSystem(conf);
+				return fs.mkdirs(path);
+			} finally {
+				closeFileSystem(fs);
+			}
+		}
+	}
+
+	public static boolean mkdirs(String file, String defaultFS, String user) throws IOException, InterruptedException {
+		UserGroupInformation ugi = UserGroupInformation.createRemoteUser(user);
+		return ugi.doAs(new MakeDirsCommandPrivilegedExceptionAction(file, defaultFS, user));
+	}
+
 //
 //	public static class CatCommandPrivilegedExceptionAction extends CommandPrivilegedExceptionAction<Void> {
 //		private String src;
@@ -523,40 +523,40 @@ public class FileSystemUtils {
 //	}
 //
 //
-//	public static class ChangeModCommandPrivilegedExceptionAction extends CommandPrivilegedExceptionAction<Void> {
-//		private String src;
-//		private String option;
-//		private boolean recursive;
-//
-//		public ChangeModCommandPrivilegedExceptionAction(String src, String option, boolean recursive, String defaultFS, String user) {
-//			super(defaultFS, user);
-//			this.src = src;
-//			this.option = option;
-//			this.recursive = recursive;
-//		}
-//
-//		@Override
-//		public Void run() throws Exception {
-//			Configuration conf = getConf();
-//
-//			FsShell fsShell = new FsShell(conf);
-//
-//			if (recursive) {
-//				fsShell.run(new String[] { "-chmod", "-R", option, src });
-//			} else {
-//				fsShell.run(new String[] { "-chmod", option, src });
-//			}
-//
-//			return null;
-//		}
-//	}
-//
-//	public static Void chmod(String src, String option, boolean recursive, String defaultFS, String user) throws IOException, InterruptedException {
-//		UserGroupInformation ugi = UserGroupInformation.createRemoteUser(user);
-//		return ugi.doAs(new ChangeModCommandPrivilegedExceptionAction(src, option, recursive, defaultFS, user));
-//	}
-//
-//
+	public static class ChangeModCommandPrivilegedExceptionAction extends CommandPrivilegedExceptionAction<Void> {
+		private String src;
+		private String option;
+		private boolean recursive;
+
+		public ChangeModCommandPrivilegedExceptionAction(String src, String option, boolean recursive, String defaultFS, String user) {
+			super(defaultFS, user);
+			this.src = src;
+			this.option = option;
+			this.recursive = recursive;
+		}
+
+		@Override
+		public Void run() throws Exception {
+			Configuration conf = getConf();
+
+			FsShell fsShell = new FsShell(conf);
+
+			if (recursive) {
+				fsShell.run(new String[] { "-chmod", "-R", option, src });
+			} else {
+				fsShell.run(new String[] { "-chmod", option, src });
+			}
+
+			return null;
+		}
+	}
+
+	public static Void chmod(String src, String option, boolean recursive, String defaultFS, String user) throws IOException, InterruptedException {
+		UserGroupInformation ugi = UserGroupInformation.createRemoteUser(user);
+		return ugi.doAs(new ChangeModCommandPrivilegedExceptionAction(src, option, recursive, defaultFS, user));
+	}
+
+
 //	public static class ChangeOwnerCommandPrivilegedExceptionAction extends CommandPrivilegedExceptionAction<Void> {
 //		private String src;
 //		private String option;

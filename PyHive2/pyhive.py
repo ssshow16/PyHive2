@@ -67,7 +67,6 @@ class HiveInfo(object):
         self.__host = "127.0.0.1"
         self.__port = 10000
         self.__isServer2 = True
-
     def setHost(self,host):
         self.__host = host
     def getHost(self):
@@ -112,6 +111,8 @@ class HiveSession(object):
         self.__fsLibs = fsLibs
     def getUser(self):
         return self.__user
+    def getPseudoUser(self):
+        return self.__pseudoUser
     def getTempDir(self):
         return self.__tempDir
     def getFsTmp(self):
@@ -207,7 +208,7 @@ def closeConnection(conn):
 def close():
     shutdownJVM()
 
-def connect(info = HiveInfo(), db = "default", user = "", password = "", properties = []):
+def connect(info = HiveInfo(), db = "default", user = "", password = "", properties = {}, updateJar=False):
 
     configuration = setGlobalRef("configuration")
 
@@ -256,9 +257,67 @@ def connect(info = HiveInfo(), db = "default", user = "", password = "", propert
             return jt
         return None
 
-    ## TODO
     conn.setFsDefault(fsDefault())
     conn.setJobTracker(jobTracker())
+
+    def setHiveconf():
+        hiveConf = configuration.getHiveConf()
+        for key in hiveConf:
+            setHive(conn,key,hiveConf[key])
+
+    def setUdfs():
+        # TODO make Hive UDF for PyHive2
+        # execute(conn,"create temporary function %s as \"%s\"" % ("Py","com.nexr.pyhive.hive.udf.RUDF"))
+        # execute(conn,"create temporary function %s as \"%s\"" % ("PyA","com.nexr.pyhive.hive.udf.RUDAF"))
+        # execute(conn,"create temporary function %s as \"%s\"" % ("unfold","com.nexr.pyhive.hive.udf.GenericUDTFUnFold"))
+        # execute(conn,"create temporary function %s as \"%s\"" % ("expand","com.nexr.pyhive.hive.udf.GenericUDTFExpand"))
+        # execute(conn,"create temporary function %s as \"%s\"" % ("rkey","com.nexr.pyhive.hive.udf.RangeKeyUDF"))
+        # execute(conn,"create temporary function %s as \"%s\"" % ("scale","com.nexr.pyhive.hive.udf.ScaleUDF"))
+        # execute(conn,"create temporary function %s as \"%s\"" % ("rank_cor","com.nexr.pyhive.hive.udf.GenericUDFRankCorrelation"))
+        pass
+
+    def makeHdfsDirs():
+        hdfsDirs = [conn.getSession().getFsUdfs(),
+                    conn.getSession().getFsTmp(),
+                    conn.getSession().getFsScripts(),
+                    conn.getSession().getFsLibs()]
+
+        for dir in hdfsDirs:
+            if hdfs.dfsExists(conn,dir) == False:
+                hdfs.dfsMkdirs(conn,dir)
+                hdfs.dfsChmod(conn,"777",dir)
+
+    def addJar(jarPath, hdfsJarPath):
+        if updateJar or hdfs.dfsExists(conn,hdfsJarPath):
+            hdfs.dfsPut(conn,jarPath,hdfsJarPath,overWrite=T)
+        execute(conn,"add jar %s" % hdfsJarPath)
+
+    def setMapredChildEnv():
+        udfutils = j2p.JUDFUtils()
+        defaultFsEnvName = udfutils.getDefaultFileSystemPropertyName()
+        baseDirEnvName = udfutils.getBaseDirectoryPropertyName()
+
+        setHive(conn,Constants.MAPRED_CHILD_ENV_CONF,
+                "%s=%s,%s=%s" % (defaultFsEnvName,conn.getFsDefault(),baseDirEnvName,conn.getSession().getFsUdfs()))
+        setHive(conn,Constants.MAPRED_MAP_CHILD_ENV_CONF,
+                "%s=%s,%s=%s" % (defaultFsEnvName,conn.getFsDefault(),baseDirEnvName,conn.getSession().getFsUdfs()))
+        setHive(conn,Constants.MAPRED_REDUCE_CHILD_ENV_CONF,
+                "%s=%s,%s=%s" % (defaultFsEnvName,conn.getFsDefault(),baseDirEnvName,conn.getSession().getFsUdfs()))
+
+    setHiveconf()
+    makeHdfsDirs()
+
+    # add jar into Hive.
+    # jar.path <- file.path(system.file(package="RHive3"), "java", "rhive.jar")
+    # hdfsJarPath = hdfsPath(conn.getFsDefault(), conn.getSession().getFsLibs(), installed.packages()["RHive3", "Version"], "rhive.jar")
+    # addJar(jar.path,hdfs.jar.path)
+
+    setUdfs()
+    setMapredChildEnv()
+    debugOff()
+
+    if db != "default":
+        useDatabases(conn,db)
 
     return conn
 
@@ -444,3 +503,10 @@ def setHive(connection, key=None, value=None):
                 return None;
     else:
         execute(connection,"set %s=%s" % (key,value))
+
+def debugOff():
+    # TODO load log4j and set log level as "ERROR"
+    # j.logger <- j2r.log4j.Logger.class()
+    # root.logger <- j.logger$getRootLogger()
+    # root.logger$setLevel(j2r.log4j.Level.class()$ERROR)
+    pass

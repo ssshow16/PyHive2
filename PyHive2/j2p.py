@@ -12,6 +12,11 @@ def FileSystemUtils():
     FileSystemUtils = hadoopPkg.FileSystemUtils
     return FileSystemUtils
 
+def JUDFUtils():
+    hadoopPkg = jpype.JPackage('com.nexr.pyhive.hive.udf') # get the package
+    UDFUtils = hadoopPkg.UDFUtils
+    return UDFUtils
+
 def JProperties():
     util = jpype.JPackage('java.util')
     Properties = util.Properties
