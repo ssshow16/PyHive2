@@ -62,44 +62,6 @@ class SysEnv(object):
     def getFsHome(self):
         return self.__fsHome
 
-class Context(object):
-    def __init__(self):
-        self.__hiveHome = os.environ.get("HIVE_HOME","")
-        self.__hiveLib = os.environ.get("HIVE_LIB","")
-        self.__hiveAuxlib = os.environ.get("HIVE_AUXLIB","")
-        self.__hiveServer2 = os.environ.get("HIVESERVER2",True)
-        self.__hadoopHome = os.environ.get("HADOOP_HOME","")
-        self.__hadoopCmd = os.environ.get("HADOOP_CMD","")
-        self.__fsHome = os.environ.get("HADOOP_HOME","")
-    def setHiveHome(self,hiveHome):
-        self.__hiveHome = hiveHome
-    def getHiveHome(self):
-        return self.__hiveHome
-    def setHiveLib(self,hiveLib):
-        self.__hiveLib = hiveLib
-    def getHiveLib(self):
-        return self.__hiveLib
-    def setHiveAuxLib(self,hiveAuxLib):
-        self.__hiveAuxLib = hiveAuxLib
-    def getHiveAuxLib(self):
-        return self.__hiveAuxLib
-    def setHiveServer2(self,hiveServer2):
-        self.__hiveServer2 = hiveServer2
-    def getHiveServer2(self):
-        return self.__hiveServer2
-    def setHadoopHome(self,hadoopHome):
-        self.__hadoopHome = hadoopHome
-    def getHadoopHome(self):
-        return self.__hadoopHome
-    def setHadoopCmd(self,hadoopCmd):
-        self.__hadoopCmd = hadoopCmd
-    def getHadoopCmd(self):
-        return self.__hadoopCmd
-    def setFsHome(self,fsHome):
-        self.__fsHome = fsHome
-    def getFsHome(self):
-        return self.__fsHome
-
 class HiveInfo(object):
     def __init__(self):
         self.__host = "127.0.0.1"
