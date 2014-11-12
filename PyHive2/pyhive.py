@@ -5,10 +5,15 @@ import subprocess
 import j2p
 import hdfs
 import tempfile
+import getpass
 import pandas as pd
 
+## Define Global Variable
+globalRef = {}
+
+## Define Class
 class Constants(object):
-    DEFAULT_FS_HOME = "/rhive"
+    DEFAULT_FS_HOME = "/pyhive"
     FS_DEFAULT_CONF = ("fs.default.name", "fs.defaultFS")
     MAPRED_JOB_TRACKER_CONF = "mapred.job.tracker"
     MAPRED_JOB_NAME_CONF = "mapred.job.name"
@@ -115,25 +120,34 @@ class HiveInfo(object):
         return self.__isServer2
 
 class HiveConnection(object):
-    def __init__(self, hiveJdbcClient, session):
-        self.__hiveJdbcClient = hiveJdbcClient
+    def __init__(self, info, session, client):
+        self.__info = info
         self.__session = session
-    def getHiveJdbcClient(self):
-        return self.__hiveJdbcClient
+        self.__client = client
+        self.__fsDefault = ""
+        self.__jobTracker = ""
+    def getClient(self):
+        return self.__client
     def setFsDefault(self,fsDefault):
         self.__fsDefault = fsDefault
     def getFsDefault(self):
         return self.__fsDefault
+    def setJobTracker(self,jobTracker):
+        self.__jobTracker = jobTracker
+    def getJobTracker(self):
+        return self.__jobTracker
     def getSession(self):
         return self.__session
 
 class HiveSession(object):
-    def __init__(self, user, fsTmp, fsUdfs):
+    def __init__(self, user, pseudoUser, fsTmp, fsUdfs,fsScripts,fsLibs):
         self.__user = user
-        self.__pseudoUser = user
+        self.__pseudoUser = pseudoUser
         self.__tempDir = tempfile.mkdtemp()
         self.__fsTmp = fsTmp
         self.__fsUdfs = fsUdfs
+        self.__fsScripts = fsScripts
+        self.__fsLibs = fsLibs
     def getUser(self):
         return self.__user
     def getTempDir(self):
@@ -142,33 +156,65 @@ class HiveSession(object):
         return self.__fsTmp
     def getFsUdfs(self):
         return self.__fsUdfs
+    def getFsScripts(self):
+        return self.__fsScripts
+    def getFsLibs(self):
+        return self.__fsLibs
 
-class pyhiveGlobalInjector(object):
-    pass
+class Configuration(object):
+    def __init__(self, sysEnv):
+        self.__sysEnv = sysEnv
+        self.__javaParams = {}
+        self.__hiveConf = {}
+        self.__logLevel = 'warn'
+        self.__opParallelLevel = 3L
+        self.__fsParallelLevel = 3L
+        self.__bigQuerySize = 1024L * 512L
+    def getSysEnv(self):
+        return self.__sysEnv
+    def getJavaParams(self):
+        return self.__javaParams
+    def getHiveConf(self):
+        return self.__hiveConf
+    def getLogLevel(self):
+        return self.__logLevel
+    def getOpParallelLevel(self):
+        return self.__opParallelLevel
+    def getFsParallelLevel(self):
+        return self.__fsParallelLevel
+    def getBigQuerySize(self):
+        return self.__bigQuerySize
+
+def setGlobalRef(key, value = None):
+    global globalRef
+    if value is None:
+        return globalRef[key]
+    else:
+        globalRef[key] = value
 
 def init():
     sysEnv = SysEnv(hiveHome=os.environ.get("HIVE_HOME",""),
                     hiveLib=os.environ.get("HIVE_LIB",""),
-                    hiveAuxlib = os.environ.get("HIVE_AUXLIB",""),
+                    hiveAuxLib = os.environ.get("HIVE_AUXLIB",""),
                     hiveServer2 = os.environ.get("HIVESERVER2",True),
                     hadoopHome = os.environ.get("HADOOP_HOME",""),
                     hadoopCmd = os.environ.get("HADOOP_CMD",""),
-                    fsHome = os.environ.get("HADOOP_HOME",""))
+                    fsHome = os.environ.get("HDFS_HOME",""))
 
+    setGlobalRef("configuration",Configuration(sysEnv))
+    # setGlobalRef("service",Service(sysEnv))  //TODO
 
-
-def startJVM(context):
+def startJVM(configuration):
 
     ## load hive lib
-    hivelibs = util.listFiles(context.getHiveHome(),"*.jar")
+    hivelibs = util.listFiles(configuration.getSysEnv().getHiveHome(),"*.jar")
 
     ## load hadoop lib
-    hadoopCmd = context.getHadoopCmd()
+    hadoopCmd = configuration.getSysEnv().getHadoopCmd()
 
-    if hadoopCmd == '' or len(hadoopCmd) <= 0:
-        if context.getHadoopHome():
-            hadoopCmd = os.path.join(context.getHadoopHome(),"bin","hadoop")
-            pass
+    if not hadoopCmd:
+        if configuration.getSysEnv().getHadoopHome():
+            hadoopCmd = os.path.join(configuration.getSysEnv().getHadoopHome(),"bin","hadoop")
         else:
             raise Exception("Both HADOOP_HOME and HADOOP_CMD are missing. "
                             "Please set HADOOP_CMD using nexr.sys.env.hadoop.cmd()")
@@ -192,63 +238,99 @@ def startJVM(context):
 def shutdownJVM():
     jpype.shutdownJVM()
 
-def closeConnection(connection):
-    client = connection.getHiveJdbcClient()
+def closeConnection(conn):
+    client = conn.getClient()
     client.close()
 
 def close():
     shutdownJVM()
 
-def connect(context = Context(), hiveInfo = HiveInfo(), db = "default", user = "", password = "", properties = []):
-    startJVM(context)
-    jHiveJdbcClient = j2p.createHiveJdbcClient(context)
-    jHiveJdbcClient.connect(hiveInfo.getHost(), hiveInfo.getport(), db, user, password)
+def connect(info = HiveInfo(), db = "default", user = "", password = "", properties = []):
 
-    # def fsHome:
-    #     if is.empty(configuration@sys.env@fs.home):
-    #         return(configuration@constants@DEFAULT.FS.HOME)
-    #     else:
-    #         return(configuration@sys.env@fs.home)
+    configuration = setGlobalRef("configuration")
 
-    hiveConnection = HiveConnection(jHiveJdbcClient)
+    startJVM(configuration)
+    client = j2p.createHiveJdbcClient(info.isServer2())
+    client.connect(info.getHost(), info.getport(), db, user, password)
+
+    def fsHome():
+        if not configuration.getSysEnv().getFsHome():
+            return Constants.DEFAULT_FS_HOME
+        else:
+            return configuration.getSysEnv().getFsHome()
+
+    def pseudoUser():
+        if not user:
+            return "anonymous"
+        else:
+            return user
+
+    def newSession(user,home):
+        return HiveSession(user = getpass.getuser(),
+                           pseudoUser = user,
+                           fsUdfs = hdfsPath(home,user,"udfs"),
+                           fsTmp= hdfsPath(home,user,"tmp"),
+                           fsScripts = hdfsPath(home,user,"scripts"),
+                           fsLibs = hdfsPath(home,user,"libs"))
+
+    home = fsHome()
+    user = pseudoUser()
+    session = newSession(user,home)
+
+    conn = HiveConnection(info = info, session=session, client=client)
+
+    def fsDefault():
+        for val in Constants.FS_DEFAULT_CONF:
+            fs = setHive(conn,val)
+            if fs:
+                fs = util.replaceWithRegex("(localhost|127.0.0.1)",info.getHost(),fs)
+                return fs
+        return None
+
+    def jobTracker():
+        jt = setHive(conn,Constants.MAPRED_JOB_TRACKER_CONF)
+        if jt:
+            jt = util.replaceWithRegex("(localhost|127.0.0.1)",info.getHost(),jt)
+            return jt
+        return None
+
     ## TODO
-    hiveConnection.setFsDefault("hdfs://localhost:9000")
+    conn.setFsDefault(fsDefault())
+    conn.setJobTracker(jobTracker())
 
-    return hiveConnection
+    return conn
 
-def query(connection, query):
-    client = connection.getHiveJdbcClient()
+def query(conn, query):
+    client = conn.getClient()
     dfModel = client.query(query)
     df = util.convertDataFrame(dfModel)
     dfModel.close()
-
     return df
 
-def execute(connection, query):
-    client = connection.getHiveJdbcClient()
+def execute(conn, query):
+    client = conn.getClient()
     dfModel = client.execute(query)
     df = util.convertDataFrame(dfModel)
     dfModel.close()
-
     return df
 
-def queryForString(connection, query):
-    client = connection.getHiveJdbcClient()
+def queryForString(conn, query):
+    client = conn.getClient()
     dfModel = client.query(query)
     dfString = dfModel.toString()
     dfModel.close()
     return dfString
 
-def execute(connection, query):
-    client = connection.getHiveJdbcClient()
+def execute(conn, query):
+    client = conn.getClient()
     client.execute(query)
 
-def loadTable(connection,tableName, limit=-1):
+def loadTable(conn,tableName, limit=-1):
     def copyData():
-        srcDir = tableLocation(connection,tableName)
+        srcDir = tableLocation(conn,tableName)
         ## TODO
         dstDir = os.getcwd()
-        hdfs.dfsGet(connection, srcDir, dstDir)
+        hdfs.dfsGet(conn, srcDir, dstDir)
         dataDir = os.path.join(dstDir,tableName)
         return dataDir
 
@@ -269,7 +351,7 @@ def loadTable(connection,tableName, limit=-1):
                     d.append(data,ignore_index=True)
 
         if d is not None:
-            d.columns = tableColumns(connection,tableName)
+            d.columns = tableColumns(conn,tableName)
 
         return d
 
@@ -278,55 +360,54 @@ def loadTable(connection,tableName, limit=-1):
 
     return df
 
-def writeTable(connection, data, tableName, sep = ",", na = ""):
+def writeTable(conn, data, tableName, sep = ",", na = ""):
     def writeDataToLocal():
-        #file <- wf(connection@session, table.name, postfix = sprintf("_%s", nexr.random.key()))
+        #file <- wf(conn@session, table.name, postfix = sprintf("_%s", nexr.random.key()))
         file = wf(tableName, postfix="_" + util.randomKeyGen())
         data.to_csv(file, sep = sep, header=None, index = False)
         return file
 
-    # def findColtypes():
-    #     type.character <- sapply(data, is.character)
-    #     type.numeric   <- sapply(data, is.numeric)
-    #     type.integer   <- sapply(data, is.integer)
-    #     type.logical   <- sapply(data, is.logical)
-    #     type.factor    <- sapply(data, is.factor)
-    #
-    #     coltypes <- character(length(data))
-    #     coltypes[type.character] <- "string"
-    #     coltypes[type.numeric] <- "double"
-    #     coltypes[type.integer] <- "int"
-    #     coltypes[type.logical] <- "boolean"
-    #     coltypes[type.factor] <- "string"
-    #
-    #     names(coltypes) <- names(data)
-    #     return(coltypes)
+    def findColTypes():
+        coltypes = data.dtypes
+        coltypes[coltypes == 'int64'] = "int"
+        coltypes[coltypes == 'float64'] = "float"
+        coltypes[coltypes == 'object'] = "string"
+        coltypes[coltypes == 'category'] = "string"
+        coltypes[coltypes == 'bool'] = "boolean"
+
+        return coltypes.tolist()
 
     def loadDataIntoHive(dataFile,coltypes):
-        #dst <- hdfs.path(connection@session@fs.tmp, basename(data.file))
-        dst = hdfsPath(connection)
-        os.path.basename(dataFile)
+        dst = hdfsPath(conn.getSession().getFsTmp(), os.path.basename(dataFile))
+        hdfs.dfsPut(conn, dataFile, dst, srcDel = False, overWrite = True)
 
-        dst = ""
-        hdfs.dfsPut(connection, dataFile, dst, srcDel = False, overWrite = True)
+        colnames = data.columns.tolist()
+        colnames = util.replaceWithRegex("[^a-zA-Z0-9]", "", colnames)
+        lcolnames = [x.lower() for x in colnames]
 
-        colnames <- gsub("[^[:alnum:]_]+", "", names(coltypes))
+        if util.isduplicated(lcolnames):
+            raise Exception("Hive doesn't support case-sensitive column-names: %s" % ",".join(colnames))
 
-        # if (any(duplicated(tolower(colnames))) == TRUE) {
-        #     stop(paste("Hive doesn't support case-sensitive column-names: ", paste(colnames, collapse = ",")))
-        # }
+        cols = []
+        for i in xrange(len(colnames)):
+            cols.append(colnames[i] + " " + coltypes[i])
 
-        cols = paste(colnames, coltypes)
         sql = "create table %s ( %s ) row format delimited fields terminated by '%s'" % (tableName, ",".join(cols), sep)
-        execute(connection,sql)
+        execute(conn,sql)
 
         sql = "load data inpath '%s' overwrite into table %s" % (dst,tableName)
-        execute(connection, l.qry)
+        execute(conn, sql)
+
+    file = writeDataToLocal()
+    coltypes = findColTypes()
+    loadDataIntoHive(file, coltypes)
+    # delete local tmp file
+    rmf(file)
 
 def hdfsPath(a,*p):
     paths = [a]
     for path in p:
-        paths.extend(path)
+        paths.extend([path])
     return "/".join(paths)
 
 def wf(name, prefix=None, postfix=None):
@@ -337,6 +418,9 @@ def wf(name, prefix=None, postfix=None):
         name = name + postfix
 
     return os.path.join(os.getcwd(),name)
+
+def rmf(file):
+    os.remove(file)
 
 def descTable(connection, tableName, extended = False):
 
@@ -384,11 +468,17 @@ def showDatabases(connection):
 def useDatabases(connection, database):
     execute(connection,"use %s" % database)
 
-def set(connection, key=None, value=None):
+def setHive(connection, key=None, value=None):
     if value == None:
         if key == None:
             return query(connection,"set -v")
         else:
-            return query(connection,"set %s" % key)
+            result = queryForString(connection,"set %s" % key)
+            result = util.splitWithRegex("=",result)
+
+            if len(result) == 2:
+                return util.replaceWithRegex("^\\s+|\\s+$","",result[1])
+            else:
+                return None;
     else:
         execute(connection,"set %s=%s" % (key,value))

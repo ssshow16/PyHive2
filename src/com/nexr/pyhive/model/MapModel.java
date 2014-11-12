@@ -17,6 +17,7 @@ public class MapModel implements DataFrameModel{
         this.columns = columns;
         this.types = types;
         this.values = values;
+
     }
 
     public int getColumnCount(){

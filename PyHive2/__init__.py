@@ -1,1 +1,3 @@
+import pyhive
 
+pyhive.init()

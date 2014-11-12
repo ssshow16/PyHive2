@@ -37,7 +37,6 @@ public class ResultSetModel implements DataFrameModel {
         return types;
     }
 
-
     public String getColumnName(int i) throws SQLException {
         return md.getColumnName(i);
     }

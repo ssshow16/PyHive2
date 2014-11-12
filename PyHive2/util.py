@@ -21,7 +21,16 @@ def searchWithRegex(value,regex,group):
     return matched.group(group)
 
 def replaceWithRegex(regex,value,org):
-    return re.sub(regex,value,org)
+    if isinstance(org,basestring):
+        return re.sub(regex,value,org)
+    else:
+        result = []
+        for s in org:
+            result.extend([re.sub(regex,value,s)])
+        return result
+
+def splitWithRegex(regex,value):
+    return re.split(regex,value)
 
 def convertDataFrame(dataFrameModel):
 
@@ -62,3 +71,6 @@ def randomWithNDigits(n):
     range_start = 10**(n-1)
     range_end = (10**n)-1
     return random.randint(range_start, range_end)
+
+def isduplicated(list):
+    return len(list)!=len(set(list))
