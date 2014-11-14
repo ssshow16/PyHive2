@@ -1,6 +1,5 @@
 package com.nexr.pyhive.model;
 
-import java.util.Formatter;
 import java.util.List;
 
 /**
@@ -17,7 +16,6 @@ public class MapModel implements DataFrameModel{
         this.columns = columns;
         this.types = types;
         this.values = values;
-
     }
 
     public int getColumnCount(){
@@ -42,7 +40,7 @@ public class MapModel implements DataFrameModel{
 
     public boolean next(){
         ++position;
-        return position < values.size();
+        return position < values.get(0).size();
     }
 
     public Object getValue(int i){

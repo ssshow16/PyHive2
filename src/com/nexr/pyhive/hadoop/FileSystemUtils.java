@@ -206,61 +206,65 @@ public class FileSystemUtils {
 		return ugi.doAs(new DiskUsageCommandPrivilegedExceptionAction(src, defaultFS, user));
 	}
 
-//	public static class DiskUsageSummaryCommandPrivilegedExceptionAction extends CommandPrivilegedExceptionAction<REXPList> {
-//		private Path path;
-//
-//		public DiskUsageSummaryCommandPrivilegedExceptionAction(String src, String defaultFS, String user) {
-//			super(defaultFS, user);
-//			this.path = new Path(src);
-//		}
-//
-//		@Override
-//		public ArrayList run() throws Exception {
-//			Configuration conf = getConf();
-//
-//			FileSystem fs = null;
-//			FileStatus[] fileStatuses = null;
-//
-//			long lens[] = null;
-//			try {
-//				fs = path.getFileSystem(conf);
-//				fileStatuses = fs.globStatus(path);
-//				if (fileStatuses == null) {
-//					fileStatuses = new FileStatus[0];
-//				}
-//
-//				lens = new long[fileStatuses.length];
-//				for (int i = 0; i < fileStatuses.length; i++) {
-//					lens[i] = fs.getContentSummary(fileStatuses[i].getPath()).getLength();
-//				}
-//
-//			} finally {
-//				closeFileSystem(fs);
-//			}
-//
-//			Map<List> rList = Collection.<String, List>emptyMap();
-//
-//			double[] lengths = new double[fileStatuses.length];
-//			String[] files = new String[fileStatuses.length];
-//
-//			for (int j = 0; j < fileStatuses.length; j++) {
-//				FileStatus fileStatus = fileStatuses[j];
-//
-//				lengths[j] = lens[j];
-//				files[j] = fileStatus.getPath().toUri().getPath();
-//			}
-//
-//			rList.put("length", new REXPDouble(lengths));
-//			rList.put("file", new REXPString(files));
-//
-//			return new REXPList(rList);
-//		}
-//	}
-//
-//	public static REXPList dus(String src, String defaultFS, String user) throws IOException, InterruptedException {
-//		UserGroupInformation ugi = UserGroupInformation.createRemoteUser(user);
-//		return ugi.doAs(new DiskUsageSummaryCommandPrivilegedExceptionAction(src, defaultFS, user));
-//	}
+	public static class DiskUsageSummaryCommandPrivilegedExceptionAction extends CommandPrivilegedExceptionAction<DataFrameModel> {
+		private Path path;
+
+		public DiskUsageSummaryCommandPrivilegedExceptionAction(String src, String defaultFS, String user) {
+			super(defaultFS, user);
+			this.path = new Path(src);
+		}
+
+		@Override
+		public DataFrameModel run() throws Exception {
+			Configuration conf = getConf();
+
+			FileSystem fs = null;
+			FileStatus[] fileStatuses = null;
+
+			long lens[] = null;
+			try {
+				fs = path.getFileSystem(conf);
+				fileStatuses = fs.globStatus(path);
+				if (fileStatuses == null) {
+					fileStatuses = new FileStatus[0];
+				}
+
+				lens = new long[fileStatuses.length];
+				for (int i = 0; i < fileStatuses.length; i++) {
+					lens[i] = fs.getContentSummary(fileStatuses[i].getPath()).getLength();
+				}
+
+			} finally {
+				closeFileSystem(fs);
+			}
+
+            List lengths = new ArrayList();
+            List files = new ArrayList();
+
+            for (int j = 0; j < fileStatuses.length; j++) {
+                FileStatus fileStatus = fileStatuses[j];
+
+                lengths.add(lens[j]);
+                files.add(fileStatus.getPath().toUri().getPath());
+            }
+
+            List<List> values = new ArrayList<List>();
+            values.add(lengths);
+            values.add(files);
+
+            DataFrameModel model = new MapModel(
+                    new String[]{"length","file"},
+                    new String[]{"double","string"},
+                    values);
+
+            return model;
+		}
+	}
+
+	public static DataFrameModel dus(String src, String defaultFS, String user) throws IOException, InterruptedException {
+		UserGroupInformation ugi = UserGroupInformation.createRemoteUser(user);
+		return ugi.doAs(new DiskUsageSummaryCommandPrivilegedExceptionAction(src, defaultFS, user));
+	}
 
 	public static class CopyFromLocalCommandPrivilegedExceptionAction extends CommandPrivilegedExceptionAction<Void> {
 		private Path srcPath;

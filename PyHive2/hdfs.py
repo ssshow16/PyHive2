@@ -3,9 +3,14 @@ __author__ = 'bruceshin'
 import j2p
 import util
 
-def dfsDiskUsage(conn, path="/"):
+def dfsDiskUsage(conn, path="/", summary=False):
     fsu = j2p.FileSystemUtils()
-    du = fsu.du(path, conn.getFsDefault(),conn.getSession().getPseudoUser())
+
+    du = None
+    if summary:
+        du = fsu.dus(path, conn.getFsDefault(),conn.getSession().getPseudoUser())
+    else:
+        du = fsu.du(path, conn.getFsDefault(),conn.getSession().getPseudoUser())
 
     return util.convertDataFrame(du)
 

@@ -307,6 +307,7 @@ def connect(info = HiveInfo(), db = "default", user = "", password = "", propert
     setHiveconf()
     makeHdfsDirs()
 
+    # TODO
     # add jar into Hive.
     # jar.path <- file.path(system.file(package="RHive3"), "java", "rhive.jar")
     # hdfsJarPath = hdfsPath(conn.getFsDefault(), conn.getSession().getFsLibs(), installed.packages()["RHive3", "Version"], "rhive.jar")
@@ -425,6 +426,53 @@ def writeTable(conn, data, tableName, sep = ",", na = ""):
     # delete local tmp file
     rmf(file)
 
+def dataSize(conn,tableName,summary=False):
+    location = tableLocation(conn,tableName)
+    dataInfo = hdfs.dfsDiskUsage(conn,location,summary)
+    return dataInfo["length"].tolist()
+
+def queryBig(conn,sql,fetchSize=5000L,limit=-1L, saveAs=None):
+    tableName = None
+    if saveAs:
+        tableName = saveAs
+    else:
+        tableName = "rs_%s" % queryId(conn)
+
+    execute(conn,"create table %s as %s" % (tableName,sql))
+
+    if saveAs:
+        length = dataSize(conn,tableName)
+        return [tableName,length]
+
+    data = loadTable(conn,tableName,limit)
+    dropTable(conn,tableName)
+
+    return data
+
+# nexr.query.b <- function(connection, sql, fetch.size = 5000L, limit = -1L, strings.as.factors = TRUE, save.as = NULL) {
+#     check.connection(connection)
+#   check.create.as(connection, sql)
+#
+#   table.name <- NULL
+#   if (!is.null(save.as)) {
+#        table.name <- save.as
+#   } else {
+#        table.name <- sprintf("rs_%s", nexr.query.id(connection))
+#   on.exit(nexr.drop.table(connection, table.name), add = TRUE)
+#   }
+#
+#   nexr.execute(connection, sprintf("create table %s as %s", table.name, sql))
+#
+#   if (!is.null(save.as)) {
+#       length <- nexr.data.size(connection, table.name)
+#   attr(table.name, "data.size") <- length
+#   return(table.name)
+#   }
+#
+#   load.table(connection, table.name, limit = limit, strings.as.factors = strings.as.factors)
+# }
+
+
 def hdfsPath(a,*p):
     paths = [a]
     for path in p:
@@ -469,6 +517,15 @@ def tableLocation(connection, tableName):
 
     return location
 
+def dbName(connection, tableName):
+    desc = descTable(connection,tableName,True)
+
+    db = util.searchWithRegex(desc,"dbName\\s*:\\s*[^,]+",0)
+    db = util.splitWithRegex(":",db)[1]
+    db = util.replaceWithRegex("^\\s+|\\s+$","",db)
+
+    return db
+
 def existsTable(connection, tableName):
     tables = showTables(connection, "^%s$" % tableName)
     return len(tables.index) == 1
@@ -503,6 +560,27 @@ def setHive(connection, key=None, value=None):
                 return None;
     else:
         execute(connection,"set %s=%s" % (key,value))
+
+def queryId(conn):
+
+    user = conn.getSession().getPseudoUser()
+
+    id = util.replaceWithRegex("^[A-Za-z ]*://[^:/]*(:[0-9]+)?","",user)
+    id = id.lower()
+    if len(id) == 0:
+        id = "rs"
+
+    return "%s_%s" % (id,util.randomKeyGen())
+
+
+# nexr.query.id <- function(connection) {
+#     id <- tolower(gsub("[^[:alnum:]]", "", connection@session@pseudo.user))
+    # if (nchar(id) == 0) {
+    # id <- "rs"
+    # }
+    #
+    # sprintf("%s_%s", id, nexr.random.key())
+    # }
 
 def debugOff():
     # TODO load log4j and set log level as "ERROR"
