@@ -228,7 +228,7 @@ public class HiveJdbcClient implements JDBCOperation {
 			statement.setMaxRows(maxRows < 0 ? 0 : maxRows);
 			statement.setFetchSize(fetchSize <= 0 ? 50 : fetchSize);
 			ResultSet rs = statement.executeQuery(query);
-			
+
 			return new ResultSetModel(rs);
 		} catch (SQLException e) {
 			if (!reconnect) {

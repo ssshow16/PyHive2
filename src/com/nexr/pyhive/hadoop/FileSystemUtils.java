@@ -4,6 +4,8 @@ import com.nexr.pyhive.model.DataFrameModel;
 import com.nexr.pyhive.model.MapModel;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.*;
+import org.apache.hadoop.hdfs.tools.DFSck;
+import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 
 import java.io.IOException;
@@ -61,88 +63,91 @@ public class FileSystemUtils {
         return true;
     }
 	
-//	public static class ListFilesCommandPrivilegedExceptionAction extends CommandPrivilegedExceptionAction<REXPList> {
-//		private Path path;
-//
-//		public ListFilesCommandPrivilegedExceptionAction(String src, String defaultFS, String user) {
-//			super(defaultFS, user);
-//			this.path = new Path(src);
-//		}
-//
-//		@Override
-//		public REXPList run() throws Exception {
-//			Configuration conf = getConf();
-//			List<FileStatus> fileList = getFileList(conf, path);
-//
-//			RList rList = new RList();
-//			String[] permissions = new String[fileList.size()];
-//			String[] owners = new String[fileList.size()];
-//			String[] groups = new String[fileList.size()];
-//			double[] lengths = new double[fileList.size()];
-//			String[] modificationTimes = new String[fileList.size()];
-//			String[] files = new String[fileList.size()];
-//
-//			for (int j = 0; j < fileList.size(); j++) {
-//				FileStatus fileStatus = fileList.get(j);
-//
-//				permissions[j] = fileStatus.getPermission().toString();
-//				owners[j] = fileStatus.getOwner();
-//				groups[j] = fileStatus.getGroup();
-//				lengths[j] = fileStatus.getLen();
-//				modificationTimes[j] = dateFormat.format(new Date(fileStatus.getModificationTime()));
-//				files[j] = fileStatus.getPath().toUri().getPath();
-//			}
-//
-//			rList.put("permission", new REXPString(permissions));
-//			rList.put("owner", new REXPString(owners));
-//			rList.put("group", new REXPString(groups));
-//			rList.put("length", new REXPDouble(lengths));
-//			rList.put("modify.time", new REXPString(modificationTimes));
-//			rList.put("file", new REXPString(files));
-//
-//			return new REXPList(rList);
-//		}
-//
-//		private List<FileStatus> getFileList(Configuration conf, Path path) throws IOException {
-//			List<FileStatus> list = new ArrayList<FileStatus>();
-//
-//			FileSystem fs = null;
-//			try {
-//				fs = path.getFileSystem(conf);
-//
-//				FileStatus[] fileStatuses = fs.globStatus(path);
-//				if (fileStatuses != null) {
-//					for (FileStatus fileStatus : fileStatuses) {
-//
-//						if (!fileStatus.isDir()) {
-//							list.add(fileStatus);
-//
-//						} else {
-//							Path dirPath = fileStatus.getPath();
-//
-//							FileStatus[] files = fs.listStatus(dirPath);
-//							if (files != null) {
-//								for (FileStatus file : files) {
-//									list.add(file);
-//								}
-//							}
-//						}
-//					}
-//				}
-//			} finally {
-//				closeFileSystem(fs);
-//			}
-//
-//			return list;
-//		}
-//	}
+	public static class ListFilesCommandPrivilegedExceptionAction extends CommandPrivilegedExceptionAction<DataFrameModel> {
+		private Path path;
 
+		public ListFilesCommandPrivilegedExceptionAction(String src, String defaultFS, String user) {
+			super(defaultFS, user);
+			this.path = new Path(src);
+		}
 
-	
-//	public static REXPList ls(String src, String defaultFS, String user) throws IOException, InterruptedException {
-//		UserGroupInformation ugi = UserGroupInformation.createRemoteUser(user);
-//		return ugi.doAs(new ListFilesCommandPrivilegedExceptionAction(src, defaultFS, user));
-//	}
+		@Override
+		public DataFrameModel run() throws Exception {
+			Configuration conf = getConf();
+			List<FileStatus> fileList = getFileList(conf, path);
+
+            List<String> permissions = new ArrayList(fileList.size());
+            List<String> owners = new ArrayList(fileList.size());
+            List<String> groups = new ArrayList(fileList.size());
+            List<Long> lengths = new ArrayList(fileList.size());
+            List<String> modificationTimes = new ArrayList(fileList.size());
+            List<String> files = new ArrayList(fileList.size());
+
+			for (int j = 0; j < fileList.size(); j++) {
+				FileStatus fileStatus = fileList.get(j);
+
+				permissions.add(fileStatus.getPermission().toString());
+				owners.add(fileStatus.getOwner());
+				groups.add(fileStatus.getGroup());
+				lengths.add(fileStatus.getLen());
+				modificationTimes.add(dateFormat.format(new Date(fileStatus.getModificationTime())));
+				files.add(fileStatus.getPath().toUri().getPath());
+			}
+
+            List<List> values = new ArrayList<List>();
+            values.add(permissions);
+            values.add(owners);
+            values.add(groups);
+            values.add(lengths);
+            values.add(modificationTimes);
+            values.add(files);
+
+            DataFrameModel model = new MapModel(
+                    new String[]{"permissions","owners","groups","lengths","modificationTimes","files"},
+                    new String[]{"string","string","string","double","string","string"},
+                    values);
+
+			return model;
+		}
+
+		private List<FileStatus> getFileList(Configuration conf, Path path) throws IOException {
+			List<FileStatus> list = new ArrayList<FileStatus>();
+
+			FileSystem fs = null;
+			try {
+				fs = path.getFileSystem(conf);
+
+				FileStatus[] fileStatuses = fs.globStatus(path);
+				if (fileStatuses != null) {
+					for (FileStatus fileStatus : fileStatuses) {
+
+						if (!fileStatus.isDir()) {
+							list.add(fileStatus);
+
+						} else {
+							Path dirPath = fileStatus.getPath();
+
+							FileStatus[] files = fs.listStatus(dirPath);
+							if (files != null) {
+								for (FileStatus file : files) {
+									list.add(file);
+								}
+							}
+						}
+					}
+				}
+			} finally {
+				closeFileSystem(fs);
+			}
+
+			return list;
+		}
+	}
+
+	public static DataFrameModel ls(String src, String defaultFS, String user) throws IOException, InterruptedException {
+		UserGroupInformation ugi = UserGroupInformation.createRemoteUser(user);
+		return ugi.doAs(new ListFilesCommandPrivilegedExceptionAction(src, defaultFS, user));
+	}
 
 	public static class DiskUsageCommandPrivilegedExceptionAction extends CommandPrivilegedExceptionAction<DataFrameModel> {
 		private Path path;
@@ -340,63 +345,63 @@ public class FileSystemUtils {
 		return ugi.doAs(new CopyToLocalCommandPrivilegedExceptionAction(delSrc, src, dst, defaultFS, user));
 	}
 
-//
-//	public static class DeleteCommandPrivilegedExceptionAction extends CommandPrivilegedExceptionAction<Boolean> {
-//		private Path path;
-//
-//		public DeleteCommandPrivilegedExceptionAction(String file, String defaultFS, String user) {
-//			super(defaultFS, user);
-//			this.path = new Path(file);
-//		}
-//
-//		@Override
-//		public Boolean run() throws Exception {
-//			Configuration conf = getConf();
-//
-//			FileSystem fs = null;
-//			try {
-//				fs = FileSystem.get(conf);
-//				return fs.delete(path, true);
-//			} finally {
-//				closeFileSystem(fs);
-//			}
-//		}
-//	}
-//
-//	public static boolean delete(String file, String defaultFS, String user) throws IOException, InterruptedException {
-//		UserGroupInformation ugi = UserGroupInformation.createRemoteUser(user);
-//		return ugi.doAs(new DeleteCommandPrivilegedExceptionAction(file, defaultFS, user));
-//	}
-//
-//
-//	public static class RenameCommandPrivilegedExceptionAction extends CommandPrivilegedExceptionAction<Boolean> {
-//		private Path srcPath;
-//		private Path dstPath;
-//
-//		public RenameCommandPrivilegedExceptionAction(String src, String dst, String defaultFS, String user) {
-//			super(defaultFS, user);
-//			this.srcPath = new Path(src);
-//			this.dstPath = new Path(dst);
-//		}
-//
-//		@Override
-//		public Boolean run() throws Exception {
-//			Configuration conf = getConf();
-//
-//			FileSystem fs = null;
-//			try {
-//				fs = FileSystem.get(conf);
-//				return fs.rename(srcPath, dstPath);
-//			} finally {
-//				closeFileSystem(fs);
-//			}
-//		}
-//	}
-//
-//	public static boolean rename(String src, String dst, String defaultFS, String user) throws IOException, InterruptedException {
-//		UserGroupInformation ugi = UserGroupInformation.createRemoteUser(user);
-//		return ugi.doAs(new RenameCommandPrivilegedExceptionAction(src, dst, defaultFS, user));
-//	}
+
+	public static class DeleteCommandPrivilegedExceptionAction extends CommandPrivilegedExceptionAction<Boolean> {
+		private Path path;
+
+		public DeleteCommandPrivilegedExceptionAction(String file, String defaultFS, String user) {
+			super(defaultFS, user);
+			this.path = new Path(file);
+		}
+
+		@Override
+		public Boolean run() throws Exception {
+			Configuration conf = getConf();
+
+			FileSystem fs = null;
+			try {
+				fs = FileSystem.get(conf);
+				return fs.delete(path, true);
+			} finally {
+				closeFileSystem(fs);
+			}
+		}
+	}
+
+	public static boolean delete(String file, String defaultFS, String user) throws IOException, InterruptedException {
+		UserGroupInformation ugi = UserGroupInformation.createRemoteUser(user);
+		return ugi.doAs(new DeleteCommandPrivilegedExceptionAction(file, defaultFS, user));
+	}
+
+
+	public static class RenameCommandPrivilegedExceptionAction extends CommandPrivilegedExceptionAction<Boolean> {
+		private Path srcPath;
+		private Path dstPath;
+
+		public RenameCommandPrivilegedExceptionAction(String src, String dst, String defaultFS, String user) {
+			super(defaultFS, user);
+			this.srcPath = new Path(src);
+			this.dstPath = new Path(dst);
+		}
+
+		@Override
+		public Boolean run() throws Exception {
+			Configuration conf = getConf();
+
+			FileSystem fs = null;
+			try {
+				fs = FileSystem.get(conf);
+				return fs.rename(srcPath, dstPath);
+			} finally {
+				closeFileSystem(fs);
+			}
+		}
+	}
+
+	public static boolean rename(String src, String dst, String defaultFS, String user) throws IOException, InterruptedException {
+		UserGroupInformation ugi = UserGroupInformation.createRemoteUser(user);
+		return ugi.doAs(new RenameCommandPrivilegedExceptionAction(src, dst, defaultFS, user));
+	}
 //
 	public static class ExistsCommandPrivilegedExceptionAction extends CommandPrivilegedExceptionAction<Boolean> {
 		private Path path;
@@ -453,80 +458,77 @@ public class FileSystemUtils {
 		return ugi.doAs(new MakeDirsCommandPrivilegedExceptionAction(file, defaultFS, user));
 	}
 
-//
-//	public static class CatCommandPrivilegedExceptionAction extends CommandPrivilegedExceptionAction<Void> {
-//		private String src;
-//
-//		public CatCommandPrivilegedExceptionAction(String src, String defaultFS, String user) {
-//			super(defaultFS, user);
-//			this.src = src;
-//		}
-//
-//		@Override
-//		public Void run() throws Exception {
-//			Configuration conf = getConf();
-//
-//			FsShell fsShell = new FsShell(conf);
-//			fsShell.run(new String[] { "-cat", src });
-//
-//			return null;
-//		}
-//	}
-//
-//	public static Void cat(String src, String defaultFS, String user) throws IOException, InterruptedException {
-//		UserGroupInformation ugi = UserGroupInformation.createRemoteUser(user);
-//		return ugi.doAs(new CatCommandPrivilegedExceptionAction(src, defaultFS, user));
-//	}
-//
-//
-//	public static class TailCommandPrivilegedExceptionAction extends CommandPrivilegedExceptionAction<Void> {
-//		private Path path;
-//		private int kB;
-//
-//		public TailCommandPrivilegedExceptionAction(String src, int kB, String defaultFS, String user) {
-//			super(defaultFS, user);
-//			this.path = new Path(src);
-//			this.kB = kB;
-//		}
-//
-//		@Override
-//		public Void run() throws Exception {
-//			FileSystem fs = null;
-//
-//			try {
-//				fs = path.getFileSystem(getConf());
-//
-//				FileStatus fileStatus = fs.getFileStatus(path);
-//				if (fileStatus.isDir()) {
-//					throw new IOException("src must be a file.");
-//				}
-//
-//				long fileSize = fileStatus.getLen();
-//				int length = kB * 1024;
-//				long offset = fileSize <= length ? 0L : fileSize - length;
-//
-//				FSDataInputStream in = fs.open(path);
-//				in.seek(offset);
-//
-//				IOUtils.copyBytes(in, System.out, length, false);
-//				in.close();
-//			} finally {
-//				closeFileSystem(fs);
-//			}
-//
-//			return null;
-//		}
-//
-//
-//
-//	}
-//
-//	public static Void tail(String src, int kB, String defaultFS, String user) throws IOException, InterruptedException {
-//		UserGroupInformation ugi = UserGroupInformation.createRemoteUser(user);
-//		return ugi.doAs(new TailCommandPrivilegedExceptionAction(src, kB, defaultFS, user));
-//	}
-//
-//
+
+	public static class CatCommandPrivilegedExceptionAction extends CommandPrivilegedExceptionAction<Void> {
+		private String src;
+
+		public CatCommandPrivilegedExceptionAction(String src, String defaultFS, String user) {
+			super(defaultFS, user);
+			this.src = src;
+		}
+
+		@Override
+		public Void run() throws Exception {
+			Configuration conf = getConf();
+
+			FsShell fsShell = new FsShell(conf);
+			fsShell.run(new String[] { "-cat", src });
+
+			return null;
+		}
+	}
+
+	public static Void cat(String src, String defaultFS, String user) throws IOException, InterruptedException {
+		UserGroupInformation ugi = UserGroupInformation.createRemoteUser(user);
+		return ugi.doAs(new CatCommandPrivilegedExceptionAction(src, defaultFS, user));
+	}
+
+
+	public static class TailCommandPrivilegedExceptionAction extends CommandPrivilegedExceptionAction<Void> {
+		private Path path;
+		private int kB;
+
+		public TailCommandPrivilegedExceptionAction(String src, int kB, String defaultFS, String user) {
+			super(defaultFS, user);
+			this.path = new Path(src);
+			this.kB = kB;
+		}
+
+		@Override
+		public Void run() throws Exception {
+			FileSystem fs = null;
+
+			try {
+				fs = path.getFileSystem(getConf());
+
+				FileStatus fileStatus = fs.getFileStatus(path);
+				if (fileStatus.isDir()) {
+					throw new IOException("src must be a file.");
+				}
+
+				long fileSize = fileStatus.getLen();
+				int length = kB * 1024;
+				long offset = fileSize <= length ? 0L : fileSize - length;
+
+				FSDataInputStream in = fs.open(path);
+				in.seek(offset);
+
+				IOUtils.copyBytes(in, System.out, length, false);
+				in.close();
+			} finally {
+				closeFileSystem(fs);
+			}
+
+			return null;
+		}
+	}
+
+	public static Void tail(String src, int kB, String defaultFS, String user) throws IOException, InterruptedException {
+		UserGroupInformation ugi = UserGroupInformation.createRemoteUser(user);
+		return ugi.doAs(new TailCommandPrivilegedExceptionAction(src, kB, defaultFS, user));
+	}
+
+
 	public static class ChangeModCommandPrivilegedExceptionAction extends CommandPrivilegedExceptionAction<Void> {
 		private String src;
 		private String option;
@@ -561,100 +563,99 @@ public class FileSystemUtils {
 	}
 
 
-//	public static class ChangeOwnerCommandPrivilegedExceptionAction extends CommandPrivilegedExceptionAction<Void> {
-//		private String src;
-//		private String option;
-//		private boolean recursive;
-//
-//		public ChangeOwnerCommandPrivilegedExceptionAction(String src, String option, boolean recursive, String defaultFS, String user) {
-//			super(defaultFS, user);
-//			this.src = src;
-//			this.option = option;
-//			this.recursive = recursive;
-//		}
-//
-//		@Override
-//		public Void run() throws Exception {
-//			Configuration conf = getConf();
-//
-//			FsShell fsShell = new FsShell(conf);
-//
-//			if (recursive) {
-//				fsShell.run(new String[] { "-chown", "-R", option, src });
-//			} else {
-//				fsShell.run(new String[] { "-chown", option, src });
-//			}
-//
-//			return null;
-//		}
-//	}
-//
-//
-//	public static Void chown(String src, String option, boolean recursive, String defaultFS, String user) throws IOException, InterruptedException {
-//		UserGroupInformation ugi = UserGroupInformation.createRemoteUser(user);
-//		return ugi.doAs(new ChangeOwnerCommandPrivilegedExceptionAction(src, option, recursive, defaultFS, user));
-//	}
-//
-//
-//	public static class ChangeGroupCommandPrivilegedExceptionAction extends CommandPrivilegedExceptionAction<Void> {
-//		private String src;
-//		private String option;
-//		private boolean recursive;
-//
-//		public ChangeGroupCommandPrivilegedExceptionAction(String src, String option, boolean recursive, String defaultFS, String user) {
-//			super(defaultFS, user);
-//			this.src = src;
-//			this.option = option;
-//			this.recursive = recursive;
-//		}
-//
-//		@Override
-//		public Void run() throws Exception {
-//			Configuration conf = getConf();
-//
-//			FsShell fsShell = new FsShell(conf);
-//
-//			if (recursive) {
-//				fsShell.run(new String[] { "-chgrp", "-R", option, src });
-//			} else {
-//				fsShell.run(new String[] { "-chgrp", option, src });
-//			}
-//
-//			return null;
-//		}
-//	}
-//
-//	public static Void chgrp(String src, String option, boolean recursive, String defaultFS, String user) throws IOException, InterruptedException {
-//		UserGroupInformation ugi = UserGroupInformation.createRemoteUser(user);
-//		return ugi.doAs(new ChangeGroupCommandPrivilegedExceptionAction(src, option, recursive, defaultFS, user));
-//	}
-//
-//
-//	public static class InfoCommandPrivilegedExceptionAction extends CommandPrivilegedExceptionAction<Void> {
-//		private String src;
-//
-//		public InfoCommandPrivilegedExceptionAction(String src, String defaultFS, String user) {
-//			super(defaultFS, user);
-//			this.src = src;
-//		}
-//
-//		@Override
-//		public Void run() throws Exception {
-//			Configuration conf = getConf();
-//
-//			DFSck dfsCk = new DFSck(conf);
-//			dfsCk.run(new String[] { src });
-//
-//			return null;
-//		}
-//	}
-//
-//	public static Void info(String src, String defaultFS, String user) throws IOException, InterruptedException {
-//		UserGroupInformation ugi = UserGroupInformation.createRemoteUser(user);
-//		return ugi.doAs(new InfoCommandPrivilegedExceptionAction(src, defaultFS, user));
-//	}
-	
-	
+	public static class ChangeOwnerCommandPrivilegedExceptionAction extends CommandPrivilegedExceptionAction<Void> {
+		private String src;
+		private String option;
+		private boolean recursive;
+
+		public ChangeOwnerCommandPrivilegedExceptionAction(String src, String option, boolean recursive, String defaultFS, String user) {
+			super(defaultFS, user);
+			this.src = src;
+			this.option = option;
+			this.recursive = recursive;
+		}
+
+		@Override
+		public Void run() throws Exception {
+			Configuration conf = getConf();
+
+			FsShell fsShell = new FsShell(conf);
+
+			if (recursive) {
+				fsShell.run(new String[] { "-chown", "-R", option, src });
+			} else {
+				fsShell.run(new String[] { "-chown", option, src });
+			}
+
+			return null;
+		}
+	}
+
+
+	public static Void chown(String src, String option, boolean recursive, String defaultFS, String user) throws IOException, InterruptedException {
+		UserGroupInformation ugi = UserGroupInformation.createRemoteUser(user);
+		return ugi.doAs(new ChangeOwnerCommandPrivilegedExceptionAction(src, option, recursive, defaultFS, user));
+	}
+
+
+	public static class ChangeGroupCommandPrivilegedExceptionAction extends CommandPrivilegedExceptionAction<Void> {
+		private String src;
+		private String option;
+		private boolean recursive;
+
+		public ChangeGroupCommandPrivilegedExceptionAction(String src, String option, boolean recursive, String defaultFS, String user) {
+			super(defaultFS, user);
+			this.src = src;
+			this.option = option;
+			this.recursive = recursive;
+		}
+
+		@Override
+		public Void run() throws Exception {
+			Configuration conf = getConf();
+
+			FsShell fsShell = new FsShell(conf);
+
+			if (recursive) {
+				fsShell.run(new String[] { "-chgrp", "-R", option, src });
+			} else {
+				fsShell.run(new String[] { "-chgrp", option, src });
+			}
+
+			return null;
+		}
+	}
+
+	public static Void chgrp(String src, String option, boolean recursive, String defaultFS, String user) throws IOException, InterruptedException {
+		UserGroupInformation ugi = UserGroupInformation.createRemoteUser(user);
+		return ugi.doAs(new ChangeGroupCommandPrivilegedExceptionAction(src, option, recursive, defaultFS, user));
+	}
+
+
+	public static class InfoCommandPrivilegedExceptionAction extends CommandPrivilegedExceptionAction<Void> {
+		private String src;
+
+		public InfoCommandPrivilegedExceptionAction(String src, String defaultFS, String user) {
+			super(defaultFS, user);
+			this.src = src;
+		}
+
+		@Override
+		public Void run() throws Exception {
+			Configuration conf = getConf();
+
+			DFSck dfsCk = new DFSck(conf);
+			dfsCk.run(new String[] { src });
+
+			return null;
+		}
+	}
+
+	public static Void info(String src, String defaultFS, String user) throws IOException, InterruptedException {
+		UserGroupInformation ugi = UserGroupInformation.createRemoteUser(user);
+		return ugi.doAs(new InfoCommandPrivilegedExceptionAction(src, defaultFS, user));
+	}
+
 	private static void closeFileSystem(FileSystem fs) {
 		try {
 			if (fs != null) {

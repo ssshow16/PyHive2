@@ -68,6 +68,24 @@ public class MapModel implements DataFrameModel{
     }
 
     public String toString() {
-        return "";
+
+        StringBuffer strBuf = new StringBuffer();
+
+        for(int i = 0 ; i < columns.length ; i++){
+            strBuf.append(columns[i]).append("\t");
+        }
+        if(values.size() < 0) return strBuf.toString();
+
+        strBuf.append("\n");
+
+        for(int rowIdx = 0 ; rowIdx < values.get(0).size() ; rowIdx++){
+            for(int colIdx = 0 ; colIdx < values.size() ; colIdx++){
+                strBuf.append(values.get(colIdx).get(rowIdx));
+                strBuf.append("\t");
+            }
+            strBuf.append("\n");
+        }
+
+        return strBuf.toString();
     }
 }

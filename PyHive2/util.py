@@ -4,6 +4,8 @@ import re
 import datetime
 import time
 import random
+import shutil
+
 from pandas import DataFrame
 
 def listFiles(root, pattern):
@@ -12,6 +14,9 @@ def listFiles(root, pattern):
         matchedFiles = fnmatch.filter(files, pattern)
         result.extend(os.path.join(base, f) for f in matchedFiles)
     return result
+
+def unlink(path):
+    shutil.rmtree(path)
 
 def trim(x):
     return re.findall("^\s*(.*?)\s*$",str(x))[0]
@@ -39,7 +44,7 @@ def convertDataFrame(dataFrameModel):
     colCnt = dataFrameModel.getColumnCount()
 
     rows = []
-    while dataFrameModel.next():
+    while dataFrameModel.next() == True:
         row = []
         for i in range(colCnt):
 
@@ -49,7 +54,7 @@ def convertDataFrame(dataFrameModel):
                 row.extend([dataFrameModel.getDoubleValue(i)])
             elif colTypes[i] == 'long':
                 row.extend([dataFrameModel.getLongValue(i)])
-            elif colTypes[i] == 'int':
+            elif colTypes[i] == 'int' or colTypes[i] == 'bigint':
                 row.extend([dataFrameModel.getIntValue(i)])
             else:
                 row.extend([dataFrameModel.getStringValue(i)])
@@ -74,3 +79,9 @@ def randomWithNDigits(n):
 
 def isduplicated(list):
     return len(list)!=len(set(list))
+
+def convertIntToBoolean(value):
+    if value == 0:
+        return False
+    else:
+        return True

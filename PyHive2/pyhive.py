@@ -11,6 +11,9 @@ import pandas as pd
 ## Define Global Variable
 globalRef = {}
 
+## Temp dictionary for PyUDF variable
+exportVals = {}
+
 ## Define Class
 class Constants(object):
     DEFAULT_FS_HOME = "/pyhive"
@@ -192,6 +195,7 @@ def startJVM(configuration):
 
     classpath.extend(hivelibs)
     classpath.extend(hadoopLibPath)
+    ## TODO
     classpath.extend([os.path.join(os.path.abspath('./out/production/PyHive2'))])
 
     classpath = ":".join(classpath)
@@ -361,12 +365,13 @@ def loadTable(conn,tableName, limit=-1):
         for base, dirs, files in os.walk(dataDir):
             for file in files:
                 path = os.path.join(base,file)
+
                 if os.path.getsize(path) == 0:
                     continue
                 if file.endswith(".crc"):
                     continue
 
-                data = pd.read_csv(path,header=None)
+                data = pd.read_csv(path,header=None,sep="\001")
                 if d == None:
                     d = data
                 else:
@@ -380,6 +385,8 @@ def loadTable(conn,tableName, limit=-1):
     dataDir = copyData()
     df = loadData(dataDir)
 
+    # delete temp directory
+    util.unlink(dataDir)
     return df
 
 def writeTable(conn, data, tableName, sep = ",", na = ""):
@@ -433,7 +440,7 @@ def dataSize(conn,tableName,summary=False):
 
 def queryBig(conn,sql,fetchSize=5000L,limit=-1L, saveAs=None):
     tableName = None
-    if saveAs:
+    if saveAs == True:
         tableName = saveAs
     else:
         tableName = "rs_%s" % queryId(conn)
@@ -445,33 +452,9 @@ def queryBig(conn,sql,fetchSize=5000L,limit=-1L, saveAs=None):
         return [tableName,length]
 
     data = loadTable(conn,tableName,limit)
-    dropTable(conn,tableName)
+    dropTable(conn,[tableName])
 
     return data
-
-# nexr.query.b <- function(connection, sql, fetch.size = 5000L, limit = -1L, strings.as.factors = TRUE, save.as = NULL) {
-#     check.connection(connection)
-#   check.create.as(connection, sql)
-#
-#   table.name <- NULL
-#   if (!is.null(save.as)) {
-#        table.name <- save.as
-#   } else {
-#        table.name <- sprintf("rs_%s", nexr.query.id(connection))
-#   on.exit(nexr.drop.table(connection, table.name), add = TRUE)
-#   }
-#
-#   nexr.execute(connection, sprintf("create table %s as %s", table.name, sql))
-#
-#   if (!is.null(save.as)) {
-#       length <- nexr.data.size(connection, table.name)
-#   attr(table.name, "data.size") <- length
-#   return(table.name)
-#   }
-#
-#   load.table(connection, table.name, limit = limit, strings.as.factors = strings.as.factors)
-# }
-
 
 def hdfsPath(a,*p):
     paths = [a]
@@ -494,7 +477,7 @@ def rmf(file):
 def descTable(connection, tableName, extended = False):
 
     result = None
-    if extended:
+    if extended == True:
         sql = "describe extended %s" % tableName
         result = queryForString(connection, sql)
     else:
@@ -533,7 +516,6 @@ def existsTable(connection, tableName):
 def dropTable(connection, tableNames):
     for tableName in tableNames:
         execute(connection,"drop table if exists %s" % tableName)
-
 
 def showTables(connection, tableNamePattern=".*"):
     result = query(connection,"show tables")
