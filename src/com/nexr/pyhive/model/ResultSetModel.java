@@ -24,7 +24,7 @@ public class ResultSetModel implements DataFrameModel {
     public String[] getColumnNames() throws SQLException {
         String[] names = new String[getColumnCount()];
         for (int i = 0; i < getColumnCount(); i++) {
-            names[i] = md.getColumnName(i+1);
+            names[i] = md.getColumnName(i + 1);
         }
         return names;
     }
@@ -32,7 +32,7 @@ public class ResultSetModel implements DataFrameModel {
     public String[] getColumnTypes() throws SQLException {
         String[] types = new String[getColumnCount()];
         for (int i = 0; i < getColumnCount(); i++) {
-            types[i] = md.getColumnTypeName(i+1);
+            types[i] = md.getColumnTypeName(i + 1);
         }
         return types;
     }

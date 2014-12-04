@@ -12,181 +12,182 @@ import java.util.Set;
 import java.util.TreeSet;
 
 class DatabaseConnection {
-	private String driver;
-	private String url;
-	private Properties properties;
+    private String driver;
+    private String url;
+    private Properties properties;
 
-	private Connection connection;
-	private DatabaseMetaData metaData;
-	private Schema schema = null;
+    private Connection connection;
+    private DatabaseMetaData metaData;
+    private Schema schema = null;
 
-	DatabaseConnection(String driver, String url, String user, String password) {
-		this.driver = driver;
-		this.url = url;
-	
-		Properties properties = new Properties();
-		properties.setProperty("user", user);
-		properties.setProperty("password", password);
-		
-		this.properties = properties;
-	}
+    DatabaseConnection(String driver, String url, String user, String password) {
+        this.driver = driver;
+        this.url = url;
 
-	DatabaseConnection(String driver, String url, Properties properties) {
-		this.driver = driver;
-		this.url = url;
-		this.properties = (properties == null ? new Properties() : properties);
-	}
+        Properties properties = new Properties();
+        properties.setProperty("user", user);
+        properties.setProperty("password", password);
 
-	@Override
-	public String toString() {
-		return getUrl();
-	}
+        this.properties = properties;
+    }
 
-	boolean connect() throws SQLException {
-		try {
-			if (driver != null && driver.length() != 0) {
-				Class.forName(driver);
-			}
-		} catch (ClassNotFoundException e) {
-			throw new SQLException(e);
-		}
+    DatabaseConnection(String driver, String url, Properties properties) {
+        this.driver = driver;
+        this.url = url;
+        this.properties = (properties == null ? new Properties() : properties);
+    }
 
-		boolean foundDriver = false;
-		try {
-			foundDriver = DriverManager.getDriver(getUrl()) != null;
-		} catch (Exception e) { }
+    @Override
+    public String toString() {
+        return getUrl();
+    }
 
-		close();
+    boolean connect() throws SQLException {
+        try {
+            if (driver != null && driver.length() != 0) {
+                Class.forName(driver);
+            }
+        } catch (ClassNotFoundException e) {
+            throw new SQLException(e);
+        }
 
-		setConnection(DriverManager.getConnection(getUrl(), properties));
-		setDatabaseMetaData(getConnection(false).getMetaData());
+        boolean foundDriver = false;
+        try {
+            foundDriver = DriverManager.getDriver(getUrl()) != null;
+        } catch (Exception e) {
+        }
 
-		return true;
-	}
+        close();
 
-	Connection getConnection(boolean reconnect) throws SQLException {
-		if (reconnect) {
-			reconnect();
-			
-			return connection;
-		} else {
-			if (connection != null) {
-				return connection;
-			}
-			
-			connect();
-			return connection;
-		}
-	}
+        setConnection(DriverManager.getConnection(getUrl(), properties));
+        setDatabaseMetaData(getConnection(false).getMetaData());
 
-	void reconnect() throws SQLException {
-		close();
-		connect();
-	}
+        return true;
+    }
 
-	void close() {
-		try {
-			if (connection != null && !connection.isClosed()) {
-				connection.close();
-			}
-		} catch (SQLException e) {
-			
-		} finally {
-			setConnection(null);
-			setDatabaseMetaData(null);
-		}
-	}
+    Connection getConnection(boolean reconnect) throws SQLException {
+        if (reconnect) {
+            reconnect();
 
-	String[] getTableNames() {
-		Schema.Table[] t = getSchema().getTables();
-		Set<String> names = new TreeSet<String>();
-		for (int i = 0; t != null && i < t.length; i++) {
-			names.add(t[i].getName());
-		}
-		return names.toArray(new String[names.size()]);
-	}
+            return connection;
+        } else {
+            if (connection != null) {
+                return connection;
+            }
 
-	Schema getSchema() {
-		if (schema == null) {
-			schema = new Schema();
-		}
-		return schema;
-	}
+            connect();
+            return connection;
+        }
+    }
 
-	void setConnection(Connection connection) {
-		this.connection = connection;
-	}
+    void reconnect() throws SQLException {
+        close();
+        connect();
+    }
 
-	DatabaseMetaData getDatabaseMetaData() {
-		return metaData;
-	}
+    void close() {
+        try {
+            if (connection != null && !connection.isClosed()) {
+                connection.close();
+            }
+        } catch (SQLException e) {
 
-	void setDatabaseMetaData(DatabaseMetaData metaData) {
-		this.metaData = metaData;
-	}
+        } finally {
+            setConnection(null);
+            setDatabaseMetaData(null);
+        }
+    }
 
-	String getUrl() {
-		return url;
-	}
+    String[] getTableNames() {
+        Schema.Table[] t = getSchema().getTables();
+        Set<String> names = new TreeSet<String>();
+        for (int i = 0; t != null && i < t.length; i++) {
+            names.add(t[i].getName());
+        }
+        return names.toArray(new String[names.size()]);
+    }
 
-	class Schema {
-		private Table[] tables = null;
+    Schema getSchema() {
+        if (schema == null) {
+            schema = new Schema();
+        }
+        return schema;
+    }
 
-		Table[] getTables() {
-			if (tables != null) {
-				return tables;
-			}
+    void setConnection(Connection connection) {
+        this.connection = connection;
+    }
 
-			List<Table> tnames = new LinkedList<Table>();
+    DatabaseMetaData getDatabaseMetaData() {
+        return metaData;
+    }
 
-			try {
-				ResultSet rs = getDatabaseMetaData().getTables(
-						getConnection(false).getCatalog(), null, "%",
-						new String[] { "TABLE" });
-				try {
-					while (rs.next()) {
-						tnames.add(new Table(rs.getString("TABLE_NAME")));
-					}
-				} finally {
-					try {
-						rs.close();
-					} catch (Exception e) {
-					}
-				}
-			} catch (Throwable t) {
-			}
-			return tables = tnames.toArray(new Table[0]);
-		}
+    void setDatabaseMetaData(DatabaseMetaData metaData) {
+        this.metaData = metaData;
+    }
 
-		Table getTable(String name) {
-			Table[] t = getTables();
-			for (int i = 0; t != null && i < t.length; i++) {
-				if (name.equalsIgnoreCase(t[i].getName())) {
-					return t[i];
-				}
-			}
-			return null;
-		}
+    String getUrl() {
+        return url;
+    }
 
-		class Table {
-			final String name;
-			Column[] columns;
+    class Schema {
+        private Table[] tables = null;
 
-			public Table(String name) {
-				this.name = name;
-			}
+        Table[] getTables() {
+            if (tables != null) {
+                return tables;
+            }
 
-			public String getName() {
-				return name;
-			}
+            List<Table> tnames = new LinkedList<Table>();
 
-			class Column {
-				final String name;
+            try {
+                ResultSet rs = getDatabaseMetaData().getTables(
+                        getConnection(false).getCatalog(), null, "%",
+                        new String[]{"TABLE"});
+                try {
+                    while (rs.next()) {
+                        tnames.add(new Table(rs.getString("TABLE_NAME")));
+                    }
+                } finally {
+                    try {
+                        rs.close();
+                    } catch (Exception e) {
+                    }
+                }
+            } catch (Throwable t) {
+            }
+            return tables = tnames.toArray(new Table[0]);
+        }
 
-				public Column(String name) {
-					this.name = name;
-				}
-			}
-		}
-	}
+        Table getTable(String name) {
+            Table[] t = getTables();
+            for (int i = 0; t != null && i < t.length; i++) {
+                if (name.equalsIgnoreCase(t[i].getName())) {
+                    return t[i];
+                }
+            }
+            return null;
+        }
+
+        class Table {
+            final String name;
+            Column[] columns;
+
+            public Table(String name) {
+                this.name = name;
+            }
+
+            public String getName() {
+                return name;
+            }
+
+            class Column {
+                final String name;
+
+                public Column(String name) {
+                    this.name = name;
+                }
+            }
+        }
+    }
 }
