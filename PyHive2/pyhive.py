@@ -243,7 +243,7 @@ def startJVM(configuration):
     classpath.extend(hivelibs)
     classpath.extend(hadoopLibPath)
     ## TODO
-    classpath.extend([os.path.join(os.path.abspath('./out/production/PyHive2'))])
+    classpath.extend([os.path.join(os.path.abspath('./lib/pyhive2.jar'))])
 
     classpath = ":".join(classpath)
 
