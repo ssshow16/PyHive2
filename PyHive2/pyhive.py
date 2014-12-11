@@ -243,8 +243,8 @@ def startJVM(configuration):
     classpath.extend(hivelibs)
     classpath.extend(hadoopLibPath)
     ## TODO
-    classpath.extend([os.path.join(os.path.abspath('./lib/pyhive2.jar'))])
-
+    # classpath.extend([os.path.join(os.path.abspath('./lib/pyhive_udf.jar'))])
+    classpath.extend(util.listFiles("PyHive2/lib", "*.jar"))
     classpath = ":".join(classpath)
 
     jpype.startJVM(jpype.getDefaultJVMPath(), "-Djava.class.path=%s" % classpath)
