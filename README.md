@@ -4,10 +4,10 @@ PyHive2
   PyHive2 is an Python package facilitating distributed computing via HIVE query.
   PyHive2 allows easy usage of HQL(Hive SQL) in Python, and allows easy usage of Python objects and Python functions in Hive.
 
-## Install PyHive
+## Install PyHive2
 1. Requirements
     - ant (in order to build java files)
-2. Installing RHive
+2. Installing PyHive2
     - Download source code: <code>git clone https://github.com/ssshow16/PyHive2.git</code>
     - Change your working directory: <code>cd PyHive2</code>
     - Set the environment variables HIVE_HOME and HADOOP_HOME:
@@ -20,7 +20,7 @@ PyHive2
     - Install PyHive2: <code>python setup.py install</code>
 
 ## Setting Environment Variable
-PyHive2 use three Environment Variable like the following
+PyHive2 use three Environment Variable like the following.
 ```
 export HIVE_HOME=/path/to/your/hive/directory
 export HADOOP_HOME=/path/to/your/hadoop/directory
