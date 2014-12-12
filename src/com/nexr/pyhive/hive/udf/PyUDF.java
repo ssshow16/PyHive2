@@ -30,6 +30,7 @@ import org.apache.hadoop.hive.ql.exec.UDFArgumentTypeException;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDF;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDFUtils;
+import org.apache.hadoop.hive.serde2.io.DoubleWritable;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector.Category;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorConverters;
@@ -37,7 +38,6 @@ import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorConverters.C
 import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector.PrimitiveCategory;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorFactory;
-import org.apache.hadoop.io.DoubleWritable;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.Text;
 import org.python.core.PyFloat;
@@ -125,7 +125,7 @@ public class PyUDF extends GenericUDF {
     @Override
     public String getDisplayString(String[] children) {
         StringBuilder sb = new StringBuilder();
-        sb.append("R(");
+        sb.append("Py(");
         for (int i = 0; i < children.length; i++) {
             sb.append(children[i]);
             if (i + 1 != children.length) {
@@ -163,8 +163,7 @@ public class PyUDF extends GenericUDF {
                     .getPrimitiveJavaObjectInspector(PrimitiveCategory.STRING);
         }
         for (int i = 0; i < arguments.length; i++) {
-            converters[i] = ObjectInspectorConverters.getConverter(
-                    arguments[i], returnOI);
+            converters[i] = ObjectInspectorConverters.getConverter(arguments[i], returnOI);
             if (arguments[i].getCategory() == Category.PRIMITIVE
                     && ((PrimitiveObjectInspector) arguments[i])
                     .getPrimitiveCategory() == PrimitiveCategory.STRING)
@@ -198,7 +197,7 @@ public class PyUDF extends GenericUDF {
                  */
                 String load =
                         "import marshal" + "\n" +
-                                "import types" + "\n";
+                        "import types" + "\n";
                 pi.exec(load);
 
                 FileSystem fs = FileSystem.get(UDFUtils.getConf());
@@ -214,9 +213,9 @@ public class PyUDF extends GenericUDF {
                      */
                     load = String.format(
                             "file = open('%s','r')\n" +
-                                    "dic = marshal.load(file)\n" +
-                                    "locals().update(dic)\n" +
-                                    "file.close()\n",
+                            "dic = marshal.load(file)\n" +
+                            "locals().update(dic)\n" +
+                            "file.close()\n",
                             vardst.toString());
                     pi.exec(load);
                 }
@@ -230,9 +229,9 @@ public class PyUDF extends GenericUDF {
                  */
                 load = String.format(
                         "file = open('%s','r')" + "\n" +
-                                "code = marshal.loads(file.read())\n" +
-                                "%s = types.FunctionType(code,globals(),'%s')\n" +
-                                "file.close()\n",
+                        "code = marshal.loads(file.read())\n" +
+                        "%s = types.FunctionType(code,globals(),'%s')\n" +
+                        "file.close()\n",
                         funcdst.toString(), name, name);
                 pi.exec(load);
             } catch (Exception e) {

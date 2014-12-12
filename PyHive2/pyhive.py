@@ -7,12 +7,13 @@ import hdfs
 import tempfile
 import getpass
 import pandas as pd
+import marshal
 
 ## Define Global Variable
 globalRef = {}
 
 ## Temp dictionary for PyUDF variable
-exportVals = {}
+exportVars = {}
 
 ## Define Class
 class Constants(object):
@@ -29,13 +30,14 @@ class Constants(object):
 
 
 class SysEnv(object):
-    def __init__(self, hiveHome, hiveLib, hiveAuxLib, hiveServer2, hadoopHome, hadoopCmd, fsHome):
+    def __init__(self, hiveHome, hiveLib, hiveAuxLib, hiveServer2, hadoopHome, hadoopCmd, hadoopConfDir, fsHome):
         self.__hiveHome = hiveHome
         self.__hiveLib = hiveLib
         self.__hiveAuxlib = hiveAuxLib
         self.__hiveServer2 = hiveServer2
         self.__hadoopHome = hadoopHome
         self.__hadoopCmd = hadoopCmd
+        self.__hadoopConfDir = hadoopConfDir
         self.__fsHome = fsHome
 
     def setHiveHome(self, hiveHome):
@@ -73,6 +75,12 @@ class SysEnv(object):
 
     def getHadoopCmd(self):
         return self.__hadoopCmd
+
+    def setHadoopConfDir(self, hadoopConfDir):
+        self.__hadoopConfDir = hadoopConfDir
+
+    def getHadoopConfDir(self):
+        return self.__hadoopConfDir
 
     def setFsHome(self, fsHome):
         self.__fsHome = fsHome
@@ -212,6 +220,7 @@ def init():
                     hiveServer2=os.environ.get("HIVESERVER2", True),
                     hadoopHome=os.environ.get("HADOOP_HOME", ""),
                     hadoopCmd=os.environ.get("HADOOP_CMD", ""),
+                    hadoopConfDir=os.environ.get("HADOOP_CONF_DIR", ""),
                     fsHome=os.environ.get("HDFS_HOME", ""))
 
     setGlobalRef("configuration", Configuration(sysEnv))
@@ -240,11 +249,12 @@ def startJVM(configuration):
     for dir in hadoopLibPath:
         classpath.extend(util.listFiles(dir, "*.jar"))
 
+    pkgPath = os.path.split(__file__)[0]
+
     classpath.extend(hivelibs)
     classpath.extend(hadoopLibPath)
-    ## TODO
-    # classpath.extend([os.path.join(os.path.abspath('./lib/pyhive_udf.jar'))])
-    classpath.extend(util.listFiles("PyHive2/lib", "*.jar"))
+    classpath.extend(util.listFiles(os.path.join(pkgPath,"lib"), "*.jar"))
+    classpath.extend(configuration.getSysEnv().getHadoopConfDir())
     classpath = ":".join(classpath)
 
     jpype.startJVM(jpype.getDefaultJVMPath(), "-Djava.class.path=%s" % classpath)
@@ -252,7 +262,6 @@ def startJVM(configuration):
 
 def shutdownJVM():
     jpype.shutdownJVM()
-
 
 def closeConnection(conn):
     client = conn.getClient()
@@ -321,7 +330,7 @@ def connect(info=HiveInfo(), db="default", user="", password="", properties={}, 
 
     def setUdfs():
         # TODO make Hive UDF for PyHive2
-        # execute(conn,"create temporary function %s as \"%s\"" % ("Py","com.nexr.pyhive.hive.udf.RUDF"))
+        execute(conn, "create temporary function %s as \"%s\"" % ("Py", "com.nexr.pyhive.hive.udf.PyUDF"))
         # execute(conn,"create temporary function %s as \"%s\"" % ("PyA","com.nexr.pyhive.hive.udf.RUDAF"))
         # execute(conn,"create temporary function %s as \"%s\"" % ("unfold","com.nexr.pyhive.hive.udf.GenericUDTFUnFold"))
         # execute(conn,"create temporary function %s as \"%s\"" % ("expand","com.nexr.pyhive.hive.udf.GenericUDTFExpand"))
@@ -342,8 +351,8 @@ def connect(info=HiveInfo(), db="default", user="", password="", properties={}, 
                 hdfs.dfsChmod(conn, "777", dir)
 
     def addJar(jarPath, hdfsJarPath):
-        if updateJar or hdfs.dfsExists(conn, hdfsJarPath):
-            hdfs.dfsPut(conn, jarPath, hdfsJarPath, overWrite=T)
+        if updateJar or hdfs.dfsExists(conn, hdfsJarPath) == False:
+            hdfs.dfsPut(conn, jarPath, hdfsJarPath, overWrite=True)
         execute(conn, "add jar %s" % hdfsJarPath)
 
     def setMapredChildEnv():
@@ -357,15 +366,15 @@ def connect(info=HiveInfo(), db="default", user="", password="", properties={}, 
                 "%s=%s,%s=%s" % (defaultFsEnvName, conn.getFsDefault(), baseDirEnvName, conn.getSession().getFsUdfs()))
         setHive(conn, Constants.MAPRED_REDUCE_CHILD_ENV_CONF,
                 "%s=%s,%s=%s" % (defaultFsEnvName, conn.getFsDefault(), baseDirEnvName, conn.getSession().getFsUdfs()))
+        setHive(conn, baseDirEnvName, conn.getSession().getFsUdfs())
 
     setHiveconf()
     makeHdfsDirs()
 
-    # TODO
-    # add jar into Hive.
-    # jar.path <- file.path(system.file(package="RHive3"), "java", "rhive.jar")
-    # hdfsJarPath = hdfsPath(conn.getFsDefault(), conn.getSession().getFsLibs(), installed.packages()["RHive3", "Version"], "rhive.jar")
-    # addJar(jar.path,hdfs.jar.path)
+    # TODO add pyhive version into path
+    jarPath = "PyHive2/lib/pyhive.jar"
+    hdfsJarPath = hdfsPath(conn.getFsDefault(), conn.getSession().getFsLibs(), "pyhive.jar")
+    addJar(jarPath, hdfsJarPath)
 
     setUdfs()
     setMapredChildEnv()
@@ -624,6 +633,26 @@ def queryId(conn):
 
     return "%s_%s" % (id, util.randomKeyGen())
 
+
+def assignVars(name, value):
+    exportVars[name] = value
+
+def export(conn, name, func):
+
+    # TODO export variable
+
+    # export function code into HDFS
+    funcPath = os.path.join(os.getcwd(), "%s.func" % name)
+    data = marshal.dumps(func.func_code)
+
+    file_i = open(funcPath,'w')
+    file_i.write(data)
+    file_i.close()
+
+    dst = hdfsPath(conn.getSession().getFsUdfs(), "%s.func" % name)
+    hdfs.dfsPut(conn,funcPath,dst,overWrite=True)
+
+    return hdfs.dfsExists(conn,dst)
 
 # nexr.query.id <- function(connection) {
 # id <- tolower(gsub("[^[:alnum:]]", "", connection@session@pseudo.user))
