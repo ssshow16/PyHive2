@@ -19,18 +19,18 @@ PyHive2
 
 ## Setting Environment Variable
 PyHive2 use three Environment Variable like the following
-'''
+```
 export HIVE_HOME=/path/to/your/hive/directory
 export HADOOP_HOME=/path/to/your/hadoop/directory
 export HADOOP_CONF_DIF=/path/to/your/hadoop/conf/directory
-'''
+```
 
 ## Loading PyHive and connecting to Hive
 1. launch python
-'''
+```
 from PyHive2 import pyhive
 conn = pyhive.connect()
-'''
+```
 
 ## Tutorials
 - [PyHive2 user guide](https://github.com/ssshow16/PyHive2/wiki/User-Guide)
