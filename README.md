@@ -47,3 +47,5 @@ $ python
 - Python 2.6
 - Hadoop 0.20.x (x >= 1)
 - Hive 0.8.x (x >= 0)
+- Pandas ( >= 0.15.0)
+- Numpy ( >= 1.9.1)

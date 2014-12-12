@@ -15,8 +15,6 @@ def listFiles(root, pattern):
         matchedFiles = fnmatch.filter(files, pattern)
         result.extend(os.path.join(base, f) for f in matchedFiles)
 
-    print(result)
-
     return result
 
 
