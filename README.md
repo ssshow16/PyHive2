@@ -28,12 +28,12 @@ export HADOOP_CONF_DIF=/path/to/your/hadoop/conf/directory
 ```
 
 ## Loading PyHive and connecting to Hive
-1. launch python
+- launch python
 ```
 > python
 ```
 
-2. import PyHive2 and connect to hive
+- import PyHive2 and connect to hive
 ```
 from PyHive2 import pyhive
 conn = pyhive.connect()
