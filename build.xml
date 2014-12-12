@@ -1,7 +1,7 @@
-<project name="pyhive_udf" basedir="./" default="build">
+<project name="pyhive" basedir="./" default="build">
     <property name="src.dir" value="src"/>
     <property name="java.src.dir" value="RHive/inst/javasrc/"/>
-    <property name="lib.dir" value="PyHive2/lib"/>
+    <property name="lib.dir" value="lib"/>
     <property name="build.dir" value="build"/>
     <property name="classes.dir" value="${build.dir}/classes"/>
     <property name="jar.dir" value="${build.dir}/jar"/>
@@ -39,13 +39,11 @@
                includeantruntime="false">
             <compilerarg line="${javac.args.warnings}"/>
         </javac>
-        <!--<unjar dest="${classes.dir}">-->
-            <!--<fileset dir="${lib.dir}">-->
-                <!--<include name="REngine.jar"/>-->
-                <!--<include name="RserveEngine.jar"/>-->
-                <!--<include name="JRI.jar"/>-->
-            <!--</fileset>-->
-        <!--</unjar>-->
+        <unjar dest="${classes.dir}">
+            <fileset dir="${lib.dir}">
+                <include name="jython-standalone-2.5.4-rc1.jar"/>
+            </fileset>
+        </unjar>
     </target>
 
     <target name="jar" depends="compile">
