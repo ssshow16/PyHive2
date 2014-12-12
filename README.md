@@ -8,8 +8,14 @@ PyHive2
 1. Requirements
     - ant (in order to build java files)
 2. Installing RHive
-    1. Download source code: <code>git clone https://github.com/ssshow16/PyHive2.git</code>
-    2. Change your working directory: <code>cd PyHive2</code>
+    1. Download source code:
+    ```
+    git clone https://github.com/ssshow16/PyHive2.git
+    ```
+    2. Change your working directory:
+    ``
+    cd PyHive2
+    ```
     3. Set the environment variables HIVE_HOME and HADOOP_HOME: 
         <code>export HIVE_HOME=/path/to/your/hive/directory</code> 
         <code>export HADOOP_HOME=/path/to/your/hadoop/directory</code>
@@ -27,6 +33,11 @@ export HADOOP_CONF_DIF=/path/to/your/hadoop/conf/directory
 
 ## Loading PyHive and connecting to Hive
 1. launch python
+```
+> python
+```
+
+2. import PyHive2 and connect to hive
 ```
 from PyHive2 import pyhive
 conn = pyhive.connect()
