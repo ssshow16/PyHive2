@@ -4,10 +4,10 @@ PyHive2
   PyHive2 is an Python package facilitating distributed computing via HIVE query.
   PyHive2 allows easy usage of HQL(Hive SQL) in Python, and allows easy usage of Python objects and Python functions in Hive.
 
-## Install PyHive
+## Install PyHive2
 1. Requirements
     - ant (in order to build java files)
-2. Installing RHive
+2. Installing PyHive2
     1. Download source code:
     ```
     git clone https://github.com/ssshow16/PyHive2.git
