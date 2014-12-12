@@ -40,7 +40,7 @@ $ python
 ```
 
 ## Tutorials
-- [PyHive2 user guide](https://github.com/ssshow16/PyHive2/wiki/User-Guide)
+- [PyHive2 user guide](https://github.com/ssshow16/PyHive2/wiki/)
 
 ## Requirements
 - Java 1.6
