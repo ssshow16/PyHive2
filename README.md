@@ -8,20 +8,27 @@ PyHive2
 1. Requirements
     - ant (in order to build java files)
 2. Installing PyHive2
-    1. Download source code:
+    - Download source code:
     ```
     git clone https://github.com/ssshow16/PyHive2.git
     ```
-    2. Change your working directory:
+    - Change your working directory:
     ``
     cd PyHive2
     ```
-    3. Set the environment variables HIVE_HOME and HADOOP_HOME: 
-        <code>export HIVE_HOME=/path/to/your/hive/directory</code> 
-        <code>export HADOOP_HOME=/path/to/your/hadoop/directory</code>
-    5. Build java files using ant: <code>ant build</code>
-    4. Build PyHive2: <code>python setup.py build</code>
-    5. Install PyHive2: <code>python setup.py install</code>
+    - Set the environment variables HIVE_HOME and HADOOP_HOME:
+    ```
+    export HIVE_HOME=/path/to/your/hive/directory
+    export HADOOP_HOME=/path/to/your/hadoop/directory
+    ```
+    - Build java files using ant
+    ```
+    ant build
+    ```
+    - Build PyHive2:
+    ```python setup.py build```
+    - Install PyHive2:
+    ```python setup.py install```
 
 ## Setting Environment Variable
 PyHive2 use three Environment Variable like the following
