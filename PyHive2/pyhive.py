@@ -12,11 +12,11 @@ import marshal
 ## Define Global Variable
 globalRef = {}
 
-## Temp dictionary for PyUDF variable
-exportVars = {}
-
 ## Define Class
 class Constants(object):
+    """
+    Constants class
+    """
     DEFAULT_FS_HOME = "/pyhive"
     FS_DEFAULT_CONF = ("fs.default.name", "fs.defaultFS")
     MAPRED_JOB_TRACKER_CONF = "mapred.job.tracker"
@@ -30,6 +30,20 @@ class Constants(object):
 
 
 class SysEnv(object):
+    """
+    System Environment class.
+
+    This class contains the following system environments.
+     - HIVE_HOME        : hive home path
+     - HIVE_LIB         : hive lib path
+     - HIVE_AUXLIB      : hive aux lib path
+     - HIVESERVER2      : hiveserver2 use
+     - HADOOP_HOME      : hadoop home path
+     - HADOOP_CMD       : hadoop cmd path
+     - HADOOP_CONF_DIR  : hadoop configuration path
+     - HDFS_HOME        : pyhive home path on HDFS
+    """
+
     def __init__(self, hiveHome, hiveLib, hiveAuxLib, hiveServer2, hadoopHome, hadoopCmd, hadoopConfDir, fsHome):
         self.__hiveHome = hiveHome
         self.__hiveLib = hiveLib
@@ -90,6 +104,9 @@ class SysEnv(object):
 
 
 class HiveInfo(object):
+    """
+    Hive Server Information
+    """
     def __init__(self):
         self.__host = "127.0.0.1"
         self.__port = 10000
@@ -142,6 +159,9 @@ class HiveConnection(object):
 
 
 class HiveSession(object):
+    """
+    Hive session information
+    """
     def __init__(self, user, pseudoUser, fsTmp, fsUdfs, fsScripts, fsLibs):
         self.__user = user
         self.__pseudoUser = pseudoUser
@@ -174,6 +194,9 @@ class HiveSession(object):
 
 
 class Configuration(object):
+    """
+    Configuration class
+    """
     def __init__(self, sysEnv):
         self.__sysEnv = sysEnv
         self.__javaParams = {}
@@ -205,7 +228,7 @@ class Configuration(object):
         return self.__bigQuerySize
 
 
-def setGlobalRef(key, value=None):
+def _set_global_ref(key, value=None):
     global globalRef
     if value is None:
         return globalRef[key]
@@ -214,6 +237,9 @@ def setGlobalRef(key, value=None):
 
 
 def init():
+    """
+    Load System environment and create Configuration with these values
+    """
     sysEnv = SysEnv(hiveHome=os.environ.get("HIVE_HOME", ""),
                     hiveLib=os.environ.get("HIVE_LIB", ""),
                     hiveAuxLib=os.environ.get("HIVE_AUXLIB", ""),
@@ -223,13 +249,17 @@ def init():
                     hadoopConfDir=os.environ.get("HADOOP_CONF_DIR", ""),
                     fsHome=os.environ.get("HDFS_HOME", ""))
 
-    setGlobalRef("configuration", Configuration(sysEnv))
-    # setGlobalRef("service",Service(sysEnv))  //TODO
+    _set_global_ref("configuration", Configuration(sysEnv))
+    # _set_global_ref("service",Service(sysEnv))  //TODO
 
 
-def startJVM(configuration):
+def start_jvm(configuration):
+    """ make classpath list and init JVM
+    :param configuration: Configuration
+        get HIVE_HOME, HADOOP_HOME from this
+    """
     ## load hive lib
-    hivelibs = util.listFiles(configuration.getSysEnv().getHiveHome(), "*.jar")
+    hivelibs = util.list_files(configuration.getSysEnv().getHiveHome(), "*.jar")
 
     ## load hadoop lib
     hadoopCmd = configuration.getSysEnv().getHadoopCmd()
@@ -247,36 +277,61 @@ def startJVM(configuration):
     classpath = []
 
     for dir in hadoopLibPath:
-        classpath.extend(util.listFiles(dir, "*.jar"))
+        classpath.extend(util.list_files(dir, "*.jar"))
 
     pkgPath = os.path.split(__file__)[0]
 
     classpath.extend(hivelibs)
     classpath.extend(hadoopLibPath)
-    classpath.extend(util.listFiles(os.path.join(pkgPath,"lib"), "*.jar"))
+    classpath.extend(util.list_files(os.path.join(pkgPath, "lib"), "*.jar"))
     classpath.extend(configuration.getSysEnv().getHadoopConfDir())
     classpath = ":".join(classpath)
 
     jpype.startJVM(jpype.getDefaultJVMPath(), "-Djava.class.path=%s" % classpath)
 
 
-def shutdownJVM():
+def shutdown_jvm():
+    """stop VM
+    TODO how to manage multi JVM
+    """
     jpype.shutdownJVM()
 
-def closeConnection(conn):
+
+def close_connection(conn):
+    """ close connection
+    :param conn: Connection
+    """
     client = conn.getClient()
     client.close()
 
 
 def close():
-    shutdownJVM()
+    """close pyhive
+    """
+    shutdown_jvm()
 
 
 def connect(info=HiveInfo(), db="default", user="", password="", properties={}, updateJar=False):
-    configuration = setGlobalRef("configuration")
+    """ connect to Hive
 
-    startJVM(configuration)
-    client = j2p.createHiveJdbcClient(info.isServer2())
+    :param info: HiveInfo
+    :param db: string
+        Hive Database Name
+    :param user: string
+        Hive User
+    :param password: string
+        Hive Password
+    :param properties: dictionary
+        JDBC URL Properties
+    :param updateJar: boolean
+        if update jar on HDFS
+
+    :return: Connection
+    """
+    configuration = _set_global_ref("configuration")
+
+    start_jvm(configuration)
+    client = j2p.create_JHiveJdbcClient(info.isServer2())
     client.connect(info.getHost(), info.getport(), db, user, password)
 
     def fsHome():
@@ -294,10 +349,10 @@ def connect(info=HiveInfo(), db="default", user="", password="", properties={}, 
     def newSession(user, home):
         return HiveSession(user=getpass.getuser(),
                            pseudoUser=user,
-                           fsUdfs=hdfsPath(home, user, "udfs"),
-                           fsTmp=hdfsPath(home, user, "tmp"),
-                           fsScripts=hdfsPath(home, user, "scripts"),
-                           fsLibs=hdfsPath(home, user, "libs"))
+                           fsUdfs=hdfs_path_join(home, user, "udfs"),
+                           fsTmp=hdfs_path_join(home, user, "tmp"),
+                           fsScripts=hdfs_path_join(home, user, "scripts"),
+                           fsLibs=hdfs_path_join(home, user, "libs"))
 
     home = fsHome()
     user = pseudoUser()
@@ -307,16 +362,16 @@ def connect(info=HiveInfo(), db="default", user="", password="", properties={}, 
 
     def fsDefault():
         for val in Constants.FS_DEFAULT_CONF:
-            fs = setHive(conn, val)
+            fs = execute_set_hive(conn, val)
             if fs:
-                fs = util.replaceWithRegex("(localhost|127.0.0.1)", info.getHost(), fs)
+                fs = util.replace_with_regex("(localhost|127.0.0.1)", info.getHost(), fs)
                 return fs
         return None
 
     def jobTracker():
-        jt = setHive(conn, Constants.MAPRED_JOB_TRACKER_CONF)
+        jt = execute_set_hive(conn, Constants.MAPRED_JOB_TRACKER_CONF)
         if jt:
-            jt = util.replaceWithRegex("(localhost|127.0.0.1)", info.getHost(), jt)
+            jt = util.replace_with_regex("(localhost|127.0.0.1)", info.getHost(), jt)
             return jt
         return None
 
@@ -326,7 +381,7 @@ def connect(info=HiveInfo(), db="default", user="", password="", properties={}, 
     def setHiveconf():
         hiveConf = configuration.getHiveConf()
         for key in hiveConf:
-            setHive(conn, key, hiveConf[key])
+            execute_set_hive(conn, key, hiveConf[key])
 
     def setUdfs():
         # TODO make Hive UDF for PyHive2
@@ -346,63 +401,86 @@ def connect(info=HiveInfo(), db="default", user="", password="", properties={}, 
                     conn.getSession().getFsLibs()]
 
         for dir in hdfsDirs:
-            if hdfs.dfsExists(conn, dir) == False:
-                hdfs.dfsMkdirs(conn, dir)
-                hdfs.dfsChmod(conn, "777", dir)
+            if hdfs.exists(conn, dir) == False:
+                hdfs.mkdirs(conn, dir)
+                hdfs.chmod(conn, "777", dir)
 
     def addJar(jarPath, hdfsJarPath):
-        if updateJar or hdfs.dfsExists(conn, hdfsJarPath) == False:
-            hdfs.dfsPut(conn, jarPath, hdfsJarPath, overWrite=True)
+        if updateJar or hdfs.exists(conn, hdfsJarPath) == False:
+            hdfs.put(conn, jarPath, hdfsJarPath, overWrite=True)
         execute(conn, "add jar %s" % hdfsJarPath)
 
     def setMapredChildEnv():
-        udfutils = j2p.JUDFUtils()
+        udfutils = j2p.get_JUDFUtils()
         defaultFsEnvName = udfutils.getDefaultFileSystemPropertyName()
         baseDirEnvName = udfutils.getBaseDirectoryPropertyName()
 
-        setHive(conn, Constants.MAPRED_CHILD_ENV_CONF,
+        execute_set_hive(conn, Constants.MAPRED_CHILD_ENV_CONF,
                 "%s=%s,%s=%s" % (defaultFsEnvName, conn.getFsDefault(), baseDirEnvName, conn.getSession().getFsUdfs()))
-        setHive(conn, Constants.MAPRED_MAP_CHILD_ENV_CONF,
+        execute_set_hive(conn, Constants.MAPRED_MAP_CHILD_ENV_CONF,
                 "%s=%s,%s=%s" % (defaultFsEnvName, conn.getFsDefault(), baseDirEnvName, conn.getSession().getFsUdfs()))
-        setHive(conn, Constants.MAPRED_REDUCE_CHILD_ENV_CONF,
+        execute_set_hive(conn, Constants.MAPRED_REDUCE_CHILD_ENV_CONF,
                 "%s=%s,%s=%s" % (defaultFsEnvName, conn.getFsDefault(), baseDirEnvName, conn.getSession().getFsUdfs()))
-        setHive(conn, baseDirEnvName, conn.getSession().getFsUdfs())
+        execute_set_hive(conn, baseDirEnvName, conn.getSession().getFsUdfs())
 
     setHiveconf()
     makeHdfsDirs()
 
     # TODO add pyhive version into path
     jarPath = "PyHive2/lib/pyhive.jar"
-    hdfsJarPath = hdfsPath(conn.getFsDefault(), conn.getSession().getFsLibs(), "pyhive.jar")
+    hdfsJarPath = hdfs_path_join(conn.getFsDefault(), conn.getSession().getFsLibs(), "pyhive.jar")
     addJar(jarPath, hdfsJarPath)
 
     setUdfs()
     setMapredChildEnv()
-    debugOff()
+    debug_off()
 
     if db != "default":
-        useDatabases(conn, db)
+        use_databases(conn, db)
 
     return conn
 
 
 def query(conn, query):
+    """ Execute the query and return the result.
+
+    :param conn: Connection
+    :param query: string
+        query statement.
+    :return: pandas.DataFrame
+        the query result
+    """
     client = conn.getClient()
     dfModel = client.query(query)
-    df = util.convertDataFrame(dfModel)
+    df = util.convert_data_frame(dfModel)
     dfModel.close()
     return df
 
 
 def execute(conn, query):
+    """ Execute the query
+
+    :param conn: Connection
+    :param query: string
+        query statement.
+    """
     client = conn.getClient()
     dfModel = client.execute(query)
-    df = util.convertDataFrame(dfModel)
+    df = util.convert_data_frame(dfModel)
     dfModel.close()
     return df
 
 
-def queryForString(conn, query):
+def query_for_string(conn, query):
+    """ Execute the query and return the result.
+
+    :param conn: Connection
+    :param query: string
+        query statement.
+
+    :return: string
+        the query result
+    """
     client = conn.getClient()
     dfModel = client.query(query)
     dfString = dfModel.toString()
@@ -410,21 +488,33 @@ def queryForString(conn, query):
     return dfString
 
 
-def execute(conn, query):
-    client = conn.getClient()
-    client.execute(query)
+# def execute(conn, query):
+# client = conn.getClient()
+# client.execute(query)
 
 
-def loadTable(conn, tableName, limit=-1):
-    def copyData():
-        srcDir = tableLocation(conn, tableName)
+def load_table(conn, tableName, limit=-1):
+    """ Load hive table data
+
+    :param conn: Connection
+    :param tableName: string
+        hive table name
+    :param limit: long
+        query size limit?
+
+    :return: pandas.DataFrame
+        hive table data
+    """
+
+    def copy_data():
+        srcDir = table_location(conn, tableName)
         ## TODO
         dstDir = os.getcwd()
-        hdfs.dfsGet(conn, srcDir, dstDir)
+        hdfs.get(conn, srcDir, dstDir)
         dataDir = os.path.join(dstDir, tableName)
         return dataDir
 
-    def loadData(dataDir):
+    def load_data(dataDir):
         d = None;
         for base, dirs, files in os.walk(dataDir):
             for file in files:
@@ -442,26 +532,38 @@ def loadTable(conn, tableName, limit=-1):
                     d.append(data, ignore_index=True)
 
         if d is not None:
-            d.columns = tableColumns(conn, tableName)
+            d.columns = table_columns(conn, tableName)
 
         return d
 
-    dataDir = copyData()
-    df = loadData(dataDir)
+    dataDir = copy_data()
+    df = load_data(dataDir)
 
     # delete temp directory
     util.unlink(dataDir)
     return df
 
 
-def writeTable(conn, data, tableName, sep=",", na=""):
-    def writeDataToLocal():
+def write_table(conn, data, tableName, sep=",", na=""):
+    """ write pandas.DataFrame into Hive
+
+    :param conn: Connection
+    :param data: pandas.DataFrame
+    :param tableName: String
+        hive table name
+    :param sep: string
+        seperate character
+    :param na: string
+        NA data string
+    """
+
+    def write_data_to_local():
         # file <- wf(conn@session, table.name, postfix = sprintf("_%s", nexr.random.key()))
-        file = wf(tableName, postfix="_" + util.randomKeyGen())
+        file = wf(tableName, postfix="_" + util.gen_random_key())
         data.to_csv(file, sep=sep, header=None, index=False)
         return file
 
-    def findColTypes():
+    def find_col_types():
         coltypes = data.dtypes
         coltypes[coltypes == 'int64'] = "int"
         coltypes[coltypes == 'float64'] = "float"
@@ -471,12 +573,12 @@ def writeTable(conn, data, tableName, sep=",", na=""):
 
         return coltypes.tolist()
 
-    def loadDataIntoHive(dataFile, coltypes):
-        dst = hdfsPath(conn.getSession().getFsTmp(), os.path.basename(dataFile))
-        hdfs.dfsPut(conn, dataFile, dst, srcDel=False, overWrite=True)
+    def load_data_into_hive(dataFile, coltypes):
+        dst = hdfs_path_join(conn.getSession().getFsTmp(), os.path.basename(dataFile))
+        hdfs.put(conn, dataFile, dst, srcDel=False, overWrite=True)
 
         colnames = data.columns.tolist()
-        colnames = util.replaceWithRegex("[^a-zA-Z0-9]", "", colnames)
+        colnames = util.replace_with_regex("[^a-zA-Z0-9]", "", colnames)
         lcolnames = [x.lower() for x in colnames]
 
         if util.isduplicated(lcolnames):
@@ -492,39 +594,68 @@ def writeTable(conn, data, tableName, sep=",", na=""):
         sql = "load data inpath '%s' overwrite into table %s" % (dst, tableName)
         execute(conn, sql)
 
-    file = writeDataToLocal()
-    coltypes = findColTypes()
-    loadDataIntoHive(file, coltypes)
+    file = write_data_to_local()
+    coltypes = find_col_types()
+    load_data_into_hive(file, coltypes)
     # delete local tmp file
     rmf(file)
 
 
-def dataSize(conn, tableName, summary=False):
-    location = tableLocation(conn, tableName)
-    dataInfo = hdfs.dfsDiskUsage(conn, location, summary)
+def data_size(conn, tableName, summary=False):
+    """ get the size of table
+    :param conn: Connection
+    :param tableName: string
+        the hive table name
+    :param summary:
+    :return: long
+        the size of hive table
+    """
+    location = table_location(conn, tableName)
+    dataInfo = hdfs.du(conn, location, summary)
     return dataInfo["length"].tolist()
 
 
-def queryBig(conn, sql, fetchSize=5000L, limit=-1L, saveAs=None):
+def query_big(conn, query, fetchSize=5000L, limit=-1L, saveAs=None):
+    """ execute the query for Big Data
+
+    :param conn: Connection
+    :param query: string
+        query statement
+    :param fetchSize:
+    :param limit:
+    :param saveAs:
+    :return: pandas.DataFrame
+        the result of query
+    """
     tableName = None
     if saveAs == True:
         tableName = saveAs
     else:
-        tableName = "rs_%s" % queryId(conn)
+        tableName = "rs_%s" % gen_query_id(conn)
 
-    execute(conn, "create table %s as %s" % (tableName, sql))
+    execute(conn, "create table %s as %s" % (tableName, query))
 
     if saveAs:
-        length = dataSize(conn, tableName)
+        length = data_size(conn, tableName)
         return [tableName, length]
 
-    data = loadTable(conn, tableName, limit)
-    dropTable(conn, [tableName])
+    data = load_table(conn, tableName, limit)
+    drop_table(conn, [tableName])
 
     return data
 
 
-def hdfsPath(a, *p):
+def hdfs_path_join(a, *p):
+    """ make file path for HDFS
+
+    :param a: string
+        start path
+    :param p: list
+
+    :return: string
+        hdfs path
+
+    """
     paths = [a]
     for path in p:
         paths.extend([path])
@@ -542,14 +673,30 @@ def wf(name, prefix=None, postfix=None):
 
 
 def rmf(file):
+    """ remove file
+
+    :param file: string
+        file path
+    """
     os.remove(file)
 
 
-def descTable(connection, tableName, extended=False):
+def desc_table(connection, tableName, extended=False):
+    """ get the description of hive table
+
+    :param connection: Connection
+    :param tableName: string
+        hive table name
+    :param extended:
+        if True, get the detail description of hive table. default is False
+    :return:
+        if extended is True, string including the detail description of hive table.
+        Otherwise, pandas.DataFrame including table scheme info.
+    """
     result = None
     if extended == True:
         sql = "describe extended %s" % tableName
-        result = queryForString(connection, sql)
+        result = query_for_string(connection, sql)
     else:
         sql = "describe %s" % tableName
         result = query(connection, sql)
@@ -558,112 +705,203 @@ def descTable(connection, tableName, extended=False):
     return result
 
 
-def tableColumns(connection, tableName):
-    desc = descTable(connection, tableName)
+def table_columns(connection, tableName):
+    """ get column names
+
+    :param connection: Connection
+    :param tableName: string
+        hive table name
+    :return: list
+        columns
+    """
+    desc = desc_table(connection, tableName)
     return desc['col_name'].tolist()
 
 
-def tableLocation(connection, tableName):
-    desc = descTable(connection, tableName, True)
+def table_location(connection, tableName):
+    """ get hdfs path for hive table
 
-    location = util.searchWithRegex(desc, "location\\s*:\\s*[^,]+", 0)
-    location = util.replaceWithRegex("^location\\s*:(\\s*)", "", location)
-    location = util.replaceWithRegex("^[A-Za-z ]*://[^:/]*(:[0-9]+)?", "", location)
+    :param connection: Connection
+    :param tableName: string
+        hive table name
+    :return: string
+        hdfs path
+    """
+    desc = desc_table(connection, tableName, True)
+
+    location = util.search_with_regex(desc, "location\\s*:\\s*[^,]+", 0)
+    location = util.replace_with_regex("^location\\s*:(\\s*)", "", location)
+    location = util.replace_with_regex("^[A-Za-z ]*://[^:/]*(:[0-9]+)?", "", location)
 
     return location
 
 
-def dbName(connection, tableName):
-    desc = descTable(connection, tableName, True)
+def dbname(connection, tableName):
+    """ get database name where hive table is
 
-    db = util.searchWithRegex(desc, "dbName\\s*:\\s*[^,]+", 0)
-    db = util.splitWithRegex(":", db)[1]
-    db = util.replaceWithRegex("^\\s+|\\s+$", "", db)
+    :param connection: Connection
+    :param tableName: string
+        hive table name
+    :return: string
+        database name
+    """
+    desc = desc_table(connection, tableName, True)
+
+    db = util.search_with_regex(desc, "dbName\\s*:\\s*[^,]+", 0)
+    db = util.split_with_regex(":", db)[1]
+    db = util.replace_with_regex("^\\s+|\\s+$", "", db)
 
     return db
 
 
-def existsTable(connection, tableName):
-    tables = showTables(connection, "^%s$" % tableName)
+def exists_table(connection, tableName):
+    """ check exists table
+    :param connection: Connection
+    :param tableName: string
+        hive table name
+    :return: boolean
+        if exists table, return True.
+        Otherwise, return False.
+    """
+    tables = show_tables(connection, "^%s$" % tableName)
     return len(tables.index) == 1
 
 
-def dropTable(connection, tableNames):
+def drop_table(connection, tableNames):
+    """ drop table
+
+    :param connection: Connection
+    :param tableNames: string
+        hive table name
+    """
     for tableName in tableNames:
         execute(connection, "drop table if exists %s" % tableName)
 
 
-def showTables(connection, tableNamePattern=".*"):
+def show_tables(connection, tableNamePattern=".*"):
+    """ show the table list in current database
+
+    :param connection: Connection
+    :param tableNamePattern: String
+        table name regex pattern. default is all table
+
+    :return: list
+        the table list matching tableNamePattern
+    """
     result = query(connection, "show tables")
     return result[result.tab_name.str.match(tableNamePattern)]
 
 
-def showDatabases(connection):
+def show_databases(connection):
+    """ show the database list
+
+    :param connection: Connection
+    :return: list
+        the database list
+    """
     result = query(connection, "show databases")
     return result
 
 
-def useDatabases(connection, database):
+def use_databases(connection, database):
+    """ change current database as "database"
+
+    :param connection: Connection
+    :param database: string
+        database name
+    """
     execute(connection, "use %s" % database)
 
 
-def setHive(connection, key=None, value=None):
+def execute_set_hive(connection, key=None, value=None):
+    """ execute "SET" query
+
+    :param connection: Connection
+    :param key: string
+        the key of configuration.
+    :param value: string
+        the value of configuration.
+    :return: list or string or None
+        if key and value is None, return all configuration variables
+        if value is None, return the value of a particular configuration variable(key)
+        if key and value is not None, override the value of a particular configuration variable(key)
+
+    """
     if value == None:
         if key == None:
             return query(connection, "set -v")
         else:
-            result = queryForString(connection, "set %s" % key)
-            result = util.splitWithRegex("=", result)
+            result = query_for_string(connection, "set %s" % key)
+            result = util.split_with_regex("=", result)
 
             if len(result) == 2:
-                return util.replaceWithRegex("^\\s+|\\s+$", "", result[1])
+                return util.replace_with_regex("^\\s+|\\s+$", "", result[1])
             else:
                 return None;
     else:
         execute(connection, "set %s=%s" % (key, value))
 
 
-def queryId(conn):
+def gen_query_id(conn):
+    """ make unique query id
+
+    :param conn: Connection
+    :return: string
+        query ID
+
+    make unique query id with the following rule:
+    [username | "rs"] + random value
+    """
     user = conn.getSession().getPseudoUser()
 
-    id = util.replaceWithRegex("^[A-Za-z ]*://[^:/]*(:[0-9]+)?", "", user)
+    id = util.replace_with_regex("^[A-Za-z ]*://[^:/]*(:[0-9]+)?", "", user)
     id = id.lower()
     if len(id) == 0:
         id = "rs"
 
-    return "%s_%s" % (id, util.randomKeyGen())
+    return "%s_%s" % (id, util.gen_random_key())
 
 
-def assignVars(name, value):
-    exportVars[name] = value
+def export(conn, name, func, vars={}):
+    """ export python object and function into HDFS for PyUDF
 
-def export(conn, name, func):
+    :param conn: connection
+    :param name: string
+        PyUDF name
+    :param func: python function
+    :param vars: dictionary
+        python objects
+    """
+    if len(vars) != 0:
+        # export function code into HDFS
+        varsPath = os.path.join(os.getcwd(), "%s.var" % name)
+        data = marshal.dumps(vars)
 
-    # TODO export variable
+        file_i = open(varsPath, 'w')
+        file_i.write(data)
+        file_i.close()
+
+        dst = hdfs_path_join(conn.getSession().getFsUdfs(), "%s.var" % name)
+        hdfs.put(conn, varsPath, dst, overWrite=True)
 
     # export function code into HDFS
     funcPath = os.path.join(os.getcwd(), "%s.func" % name)
     data = marshal.dumps(func.func_code)
 
-    file_i = open(funcPath,'w')
+    file_i = open(funcPath, 'w')
     file_i.write(data)
     file_i.close()
 
-    dst = hdfsPath(conn.getSession().getFsUdfs(), "%s.func" % name)
-    hdfs.dfsPut(conn,funcPath,dst,overWrite=True)
+    dst = hdfs_path_join(conn.getSession().getFsUdfs(), "%s.func" % name)
+    hdfs.put(conn, funcPath, dst, overWrite=True)
 
-    return hdfs.dfsExists(conn,dst)
+    return hdfs.exists(conn, dst)
 
-# nexr.query.id <- function(connection) {
-# id <- tolower(gsub("[^[:alnum:]]", "", connection@session@pseudo.user))
-# if (nchar(id) == 0) {
-# id <- "rs"
-# }
-#
-# sprintf("%s_%s", id, nexr.random.key())
-# }
 
-def debugOff():
+def debug_off():
+    """
+    off print java log
+    """
     # TODO load log4j and set log level as "ERROR"
     # j.logger <- j2r.log4j.Logger.class()
     # root.logger <- j.logger$getRootLogger()
