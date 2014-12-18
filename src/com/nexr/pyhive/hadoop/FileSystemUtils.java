@@ -2,13 +2,17 @@ package com.nexr.pyhive.hadoop;
 
 import com.nexr.pyhive.model.DataFrameModel;
 import com.nexr.pyhive.model.MapModel;
+import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.*;
 import org.apache.hadoop.hdfs.tools.DFSck;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 
+import java.io.File;
+import java.io.FilenameFilter;
 import java.io.IOException;
+import java.net.URL;
 import java.security.PrivilegedExceptionAction;
 import java.text.SimpleDateFormat;
 import java.util.*;
@@ -38,15 +42,41 @@ public class FileSystemUtils {
         }
     }
 
-    public static Configuration getConf(String defaultFS, String user) {
+    public static Configuration getConf(String defaultFS, String user){
+
         Configuration conf = new Configuration();
 
-        if (defaultFS != null) {
-            FileSystem.setDefaultUri(conf, defaultFS);
+//        String hadoopConfPath = System.getProperty("HADOOP_CONF_DIR");
+        String hadoopConfPath = System.getenv("HADOOP_CONF_DIR");
+
+        if (StringUtils.isNotEmpty(hadoopConfPath)) {
+
+            File dir = new File(hadoopConfPath);
+            if (!dir.exists() || !dir.isDirectory()) {
+                return conf;
+            }
+
+            File[] files = dir.listFiles(
+                    new FilenameFilter() {
+                        public boolean accept(File dir, String name) {
+                            return name.endsWith("xml");
+                        }
+                    }
+            );
+
+            for (File file : files) {
+                try {
+                    URL url = new URL("file://" + file.getCanonicalPath());
+                    conf.addResource(url);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
         }
 
-        if (user != null) {
-            conf.set("hadoop.job.ugi", user);
+        //override defaultFS
+        if (StringUtils.isNotEmpty(defaultFS)) {
+            FileSystem.setDefaultUri(conf, defaultFS);
         }
 
         return conf;
